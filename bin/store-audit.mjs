@@ -148,8 +148,17 @@ const rows = lines.map((l) => /^(pass|fail|skip|note) (\S+?)(?:: (.*))?$/.exec(l
   .map(([, status, check, detail = '']) => ({ status, check, detail }));
 const of = (name) => rows.filter((r) => r.check === name || r.check.startsWith(`${name}:`));
 
-if (v.status === 2 || v.status === 64 || v.status === null) {
-  const why = (rows.find((r) => r.status === 'fail') || {}).detail || `${v.stderr || ''}`.trim().split('\n').pop() || `exit ${v.status}`;
+// Only exit 0 or 1 is a run that reported its checks; anything else (2, 64, a crash, no spawn)
+// measured nothing, whatever rows it printed before stopping.
+const verifyRan = v.status === 0 || v.status === 1;
+const lastErr = `${v.stderr || ''}`.trim().split('\n').pop() || `exit ${v.status}`;
+// A check passes only on a row that says so: no row is no measurement, never a pass.
+function passOrUnmeasured(check, name, ok) {
+  if (ok) pass(check);
+  else unmeasured(check, `no WP-CLI answer or woo-verify printed no result for ${name} (exit ${v.status}: ${lastErr.slice(0, 200)})`);
+}
+if (!verifyRan) {
+  const why = (rows.find((r) => r.status === 'fail') || {}).detail || lastErr;
   const reason = /WP-CLI/.test(why) ? `no WP-CLI answer: ${why}` : `the site did not answer over the network: ${why}`;
   for (const id of ['STORE-001', 'STORE-002', 'STORE-003', 'STORE-004']) unmeasured(id, reason);
 } else {
@@ -160,7 +169,7 @@ if (v.status === 2 || v.status === 64 || v.status === null) {
   else if (sFail) {
     const notes = setup.filter((r) => r.status === 'note').map((r) => r.detail);
     finding('STORE-001', SEVERITY['STORE-001'], OWNER['STORE-001'], 'site', `the store no longer matches its store block: ${sFail.detail}`, notes.join('; ') || sFail.detail);
-  } else pass('STORE-001');
+  } else passOrUnmeasured('STORE-001', 'setup', setup.some((r) => r.status === 'pass'));
 
   // STORE-002 and STORE-003: a coming-soon store shows visitors a placeholder on every page.
   const comingSoon = rows.find((r) => r.check === 'pages' && r.status === 'skip');
@@ -170,10 +179,10 @@ if (v.status === 2 || v.status === 64 || v.status === null) {
   } else {
     const pFail = of('page').filter((r) => r.status === 'fail');
     if (pFail.length) finding('STORE-002', SEVERITY['STORE-002'], OWNER['STORE-002'], 'site', `${pFail.length} store page(s) fail: ${pFail.map((r) => r.check.slice(5)).join(', ')}`, pFail.map((r) => `${r.check}: ${r.detail}`).join('; '));
-    else pass('STORE-002');
+    else passOrUnmeasured('STORE-002', 'the store pages', of('page').filter((r) => r.status === 'pass').length === 4);
     const shop = of('shop').find((r) => r.status === 'fail');
     if (shop) finding('STORE-003', SEVERITY['STORE-003'], OWNER['STORE-003'], 'site', shop.detail, `woo-verify: fail shop: ${shop.detail}`);
-    else pass('STORE-003');
+    else passOrUnmeasured('STORE-003', 'shop', of('shop').some((r) => r.status === 'pass'));
   }
 
   // STORE-004: a Store API cart.
@@ -181,7 +190,7 @@ if (v.status === 2 || v.status === 64 || v.status === null) {
   const cFail = cart.find((r) => r.status === 'fail');
   if (cart.some((r) => r.status === 'skip')) unmeasured('STORE-004', 'report-only run: the cart check opens a Store API cart session, a write this run may not make');
   else if (cFail) finding('STORE-004', SEVERITY['STORE-004'], OWNER['STORE-004'], 'site', cFail.detail, `woo-verify: fail cart: ${cFail.detail}`);
-  else pass('STORE-004');
+  else passOrUnmeasured('STORE-004', 'cart', cart.some((r) => r.status === 'pass'));
 }
 
 // --- STORE-005..014: the database, through WP-CLI ---------------------------------------------------
@@ -196,4 +205,4 @@ if (facts.error) {
   }
 }
 
-done(v.status === 2 && facts.error ? 2 : undefined);
+done(!verifyRan && facts.error ? 2 : undefined);

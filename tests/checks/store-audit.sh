@@ -42,6 +42,11 @@ node --input-type=module -e 'import { AUDIT_CATEGORIES } from "./bin/lib/manifes
 need_token "$tool" "if (readOnly) vArgs.push('--read-only');"
 need_token "$tool" "unmeasured('STORE-004', 'report-only run: the cart check opens a Store API cart session, a write this run may not make');"
 need_token "$tool" "if (engine !== 'native') nothing("
+# A check passes only on a woo-verify row that says so: a run that crashed printed none, and
+# only exit 0 or 1 is a run that reported its checks.
+need_token "$tool" "const verifyRan = v.status === 0 || v.status === 1;"
+for id in STORE-001 STORE-002 STORE-003 STORE-004; do need_token "$tool" "passOrUnmeasured('$id'"; done
+if grep -E "^\s*(\} )?else pass\('STORE-00[1-4]'\)" "$tool" >/dev/null; then fail "$tool passes a woo-verify check with no row for it"; fi
 if grep -E "update_option|delete_option|wp_insert_post|wp_update_post|->save\(|->delete\(|set_transient|->query\(" "$php" >/dev/null; then
   fail "$php writes to the store; it only reads"
 fi

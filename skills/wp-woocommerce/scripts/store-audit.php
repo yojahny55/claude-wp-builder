@@ -219,17 +219,16 @@ function storeaudit_scheduler() {
 		return storeaudit_na( 'STORE-012', 'Action Scheduler has no table on this site' );
 	}
 	$since = gmdate( 'Y-m-d H:i:s', time() - 7 * DAY_IN_SECONDS );
-	$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT hook, COUNT(*) AS n FROM $table WHERE status = 'failed' AND last_attempt_gmt >= %s GROUP BY hook ORDER BY n DESC LIMIT 5", $since ) );
-	if ( ! $rows ) {
+	$sum   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table WHERE status = 'failed' AND last_attempt_gmt >= %s", $since ) );
+	if ( ! $sum ) {
 		return storeaudit_row( 'STORE-012', 'pass', '', '', "$table", 'no scheduled action failed in the last 7 days' );
 	}
+	$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT hook, COUNT(*) AS n FROM $table WHERE status = 'failed' AND last_attempt_gmt >= %s GROUP BY hook ORDER BY n DESC LIMIT 5", $since ) );
 	$parts = array();
-	$sum   = 0;
 	foreach ( $rows as $r ) {
 		$parts[] = $r->hook . ' x' . $r->n;
-		$sum    += (int) $r->n;
 	}
-	return storeaudit_row( 'STORE-012', 'fail', 'WARNING', 'manual', "$table", "$sum scheduled action(s) failed in the last 7 days -- WooCommerce runs emails, webhooks, stock and analytics through them: " . implode( ', ', $parts ), "status = failed, last_attempt_gmt >= $since" );
+	return storeaudit_row( 'STORE-012', 'fail', 'WARNING', 'manual', "$table", "$sum scheduled action(s) failed in the last 7 days -- WooCommerce runs emails, webhooks, stock and analytics through them; most failed hooks: " . implode( ', ', $parts ), "status = failed, last_attempt_gmt >= $since" );
 }
 
 function storeaudit_hpos() {
