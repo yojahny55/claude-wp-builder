@@ -275,8 +275,12 @@ Server setup, permissions, and WordPress configuration.
   `/wp-woo-setup` Step 6.5 installs [a fixed enquiry file](templates/store/store-enquiry.php)
   into a catalog store's theme, which adds the WhatsApp number, message and enquiry form to the
   settings page and renders the filled ones on product pages while catalog mode is on
-  ([check](tests/checks/store-enquiry.sh), [on a real store](tests/checks/store-enquiry-integration.sh)). Not started, each its own spec: store demo
-  pages, product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
+  ([check](tests/checks/store-enquiry.sh), [on a real store](tests/checks/store-enquiry-integration.sh)). Piece 3 has its first half: a demo's store pages are `role: store`
+  with their WooCommerce surface in the [`/wp-yolo`](commands/wp-yolo.md) manifest
+  ([wp-normalize](agents/wp-normalize.md)), so no WP Page or section build collides with
+  WooCommerce's own pages, and every demo link to them is reported for review
+  ([check](tests/checks/store-demo-pages.sh)); styling those pages from the demo and rewiring
+  their links are still to come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`

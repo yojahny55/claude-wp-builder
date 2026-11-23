@@ -96,7 +96,7 @@ grep for `<!-- ============ SECTION:` in that page, and the claim is per page.
 authoring the pages: each page's `role`, and each section's `name`, `kind`, `cpt` and
 `block`, plus the `contentTypes[]` it built teasers and listings for. Read that file first.
 
-Where it applies, **those values are given, not guessed**: copy `role`, `kind`, `cpt` and
+Where it applies, **those values are given, not guessed**: copy `role`, `store`, `kind`, `cpt` and
 `block` into the manifest verbatim, skip the Classifier Rubric and the contact detection for
 those sections entirely, emit no `confidence`/`rationale` for them, and add no `review[]`
 entry — there is no non-determinism to report. This is the whole point of the file: a demo
@@ -176,6 +176,21 @@ custom-post-type → the teaser block's section `kind: "cpt-teaser"`, plus a
   (`archive-team.php`), **not** a `page-team.php` static page. This page gets
   `role: 'cpt-archive'` in the manifest and **no WP Page is created** for it (the archive
   has its own URL via `has_archive`, wired in Phase 2/3, not by `/wp-seed` page creation).
+- A store page → `role: 'store'`, with `store` naming the WooCommerce surface it shows:
+  `shop` (a product listing, collection or category), `product` (one product with price and
+  an add-to-cart or enquiry action), `cart`, `checkout`, or `account` (login, orders,
+  addresses). WooCommerce owns these URLs and renders them with its own templates, so **no
+  WP Page and no section build** comes from them: a `page-shop.php` would never be shown, and
+  a WP Page at `shop` collides with WooCommerce's shop page. Decide from the page, not its file
+  name alone: a filename such as `shop`, `tienda`, `store`, `products`, `product`, `cart`,
+  `carrito`, `basket`, `checkout`, `account` or `my-account` is a hint, and the page must also
+  show its surface (product cards with prices, a price with a buy or enquiry button, a line-item
+  table with totals, billing fields, a login or orders panel). A marketing page with a few
+  product cards is not a store page. Below `confidence` 0.8, keep `role: 'inner'` and add a
+  `review[]` entry naming the page and the surface it might be. Every `product` page found
+  is listed, none is turned into seed data: product seeding is its own step. A translated
+  store page (`es/tienda.html`) is `role: 'store'` too: WooCommerce has one page per surface
+  until the Polylang bridge exists.
 - Detail pages like `team/john.html` → **seed data** for single posts, not templates —
   each becomes one entry in that content type's `seed[]`, not a page.
 - The home "Team" block (the teaser) → a **query section**, i.e. `kind: 'cpt-teaser'` in
@@ -192,7 +207,8 @@ Emit exactly this key set (Task 4's orchestrator consumes these keys verbatim):
   "pages": [
     {
       "slug": "<string>",
-      "role": "home" | "inner" | "cpt-archive" | "blog",
+      "role": "home" | "inner" | "cpt-archive" | "blog" | "store",
+      "store": "shop" | "product" | "cart" | "checkout" | "account", // only on role store
       "file": "demo/<slug>.html",
       "sections": [
         {

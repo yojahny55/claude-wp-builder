@@ -50,8 +50,8 @@ for old in 'Each product offers an enquiry form' "products are the Polylang brid
   if grep -Fq "$old" "$skill"; then fail "$skill still says: $old"; fi
 done
 if grep -Fq "they live in the theme's settings" "$cmd"; then fail "$cmd still puts the WhatsApp number in a settings page no starter has"; fi
-grep -Fq 'no starter theme renders the enquiry form or the WhatsApp button' "$skill" \
-  || fail "$skill does not say the catalog's enquiry form and WhatsApp button are not rendered"
+grep -Fq 'installs `templates/store/store-enquiry.php` into the theme for the WhatsApp button and the enquiry form' "$skill" \
+  || fail "$skill does not say where the catalog's enquiry form and WhatsApp button come from"
 grep -Fq 'no bridge between WooCommerce and Polylang' "$skill" \
   || fail "$skill does not say products stay untranslated"
 

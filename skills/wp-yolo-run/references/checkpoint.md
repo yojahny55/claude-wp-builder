@@ -13,7 +13,7 @@ Skipped:          <out-of-scope pages, missing-HTML pages> | none
 Review:           <review[] items> | none
 ```
 Cover, at minimum:
-- Pages (slug, role: home / inner / cpt-archive / blog) and their sections (name, kind,
+- Pages (slug, role: home / inner / cpt-archive / blog / store, with the store surface) and their sections (name, kind,
   confidence where < 1.0)
 - Shared header/footer flags and any divergent pages
 - Content-type classifications (`contentTypes[]`) with field lists
