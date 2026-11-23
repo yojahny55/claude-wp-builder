@@ -96,7 +96,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh tests/checks/legal-pages-integration.sh tests/checks/webp-on-upload-integration.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh tests/checks/legal-pages-integration.sh tests/checks/webp-on-upload-integration.sh tests/checks/theme-screenshot.sh'
           bash tests/run.sh -j 4 --exclude "$skip_here"
 
   syntax:
@@ -390,6 +390,9 @@ jobs:
         run: |
           echo "::group::demo-verify no-motion"
           bash tests/checks/demo-verify-no-motion.sh
+          echo "::endgroup::"
+          echo "::group::theme screenshot"
+          bash tests/checks/theme-screenshot.sh
           echo "::endgroup::"
 
   visual:
