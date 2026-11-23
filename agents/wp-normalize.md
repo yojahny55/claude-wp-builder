@@ -187,8 +187,9 @@ custom-post-type → the teaser block's section `kind: "cpt-teaser"`, plus a
   show its surface (product cards with prices, a price with a buy or enquiry button, a line-item
   table with totals, billing fields, a login or orders panel). A marketing page with a few
   product cards is not a store page. Below `confidence` 0.8, keep `role: 'inner'` and add a
-  `review[]` entry naming the page and the surface it might be. Every `product` page found
-  is listed, none is turned into seed data: product seeding is its own step. A translated
+  `review[]` entry naming the page and the surface it might be. The products those pages
+  show become the top-level `products[]` (below), which `/wp-seed --products` creates in
+  WooCommerce; the pages themselves are never seed data. A translated
   store page (`es/tienda.html`) is `role: 'store'` too: WooCommerce has one page per surface
   until the Polylang bridge exists.
 - Detail pages like `team/john.html` → **seed data** for single posts, not templates —
@@ -238,9 +239,37 @@ Emit exactly this key set (Task 4's orchestrator consumes these keys verbatim):
       "seed": [ /* one entry per demo card / detail page */ ]
     }
   ],
+  "products": [ /* only when a page is role store: one entry per distinct product */ ],
   "review": [ /* every low-confidence decision, one string each, human-readable */ ]
 }
 ```
+
+### `products[]` — the store's products
+
+Only when at least one page is `role: 'store'` with `store` `shop` or `product`; otherwise omit
+the key. One entry per distinct product the demo shows, merged across the shop's cards and the
+product's own page (the page has the fuller description and gallery):
+
+```jsonc
+{ "name": "Stoneware Mug", "sku": "MUG-1", "regular_price": "24.00", "sale_price": "19.00",
+  "short_description": "Hand thrown.", "description": "<p>…</p>",
+  "categories": ["Kitchen"], "image": "images/mug.jpg", "gallery": ["images/mug-2.jpg"],
+  "external_url": "https://…", "button_text": "Buy at the dealer",
+  "options": { "Size": ["S", "M"] }, "source": "shop.html" }
+```
+
+- `name` and `regular_price` are required. A price is a plain decimal string as the demo
+  shows it, without the currency sign or thousands separator (`"$1,299.00"` → `"1299.00"`).
+  A struck-through price beside a lower one is `regular_price` and `sale_price`. A card with no
+  price is not a product entry: list it in `review[]`.
+- `sku` only when the demo prints one; never invent it. `image` and `gallery` are paths relative
+  to `demo/`, as in `assets`, or the demo's absolute URLs.
+- `external_url` only when the buy button leaves the site (a dealer or marketplace link).
+  `options` when the page offers a choice (size, colour); its variations are not built, so the
+  product is seeded as a draft and reported for review.
+- Copy the text as the demo shows it; never write copy, prices or categories the demo does not
+  show. Products in a second language are not entries: products stay untranslated until the
+  Polylang bridge exists.
 
 ### Filled example
 
@@ -560,7 +589,7 @@ the existing classification entries — the checkpoint reader treats them the sa
 
 `Bash` is granted to this agent for this step **only**: do not use it to analyze the demo,
 fetch anything, or write files — the analysis stays your own DOM reasoning. Before reporting
-done, confirm the manifest you wrote parses and that every page file it names exists (paths are relative to the project root):
+done, confirm the manifest you wrote parses, that every page file it names exists (paths are relative to the project root), and that every product has a name and a plain price:
 
 ```bash
 node -e '
@@ -568,8 +597,10 @@ const fs = require("fs");
 const m = JSON.parse(fs.readFileSync("demo/.yolo-manifest.json", "utf8"));
 const missing = (m.pages || []).filter((p) => p.file && !fs.existsSync(p.file));
 if (missing.length) { console.error("missing page files:", missing.map((p) => p.file).join(", ")); process.exit(1); }
-console.log("ok: manifest parses,", (m.pages || []).length, "page(s)");
+const bad = (m.products || []).filter((p) => !p || typeof p.name !== "string" || !/^\d+(\.\d{1,4})?$/.test(String(p.regular_price)));
+if (bad.length) { console.error("products without a name or a plain regular_price:", bad.map((p) => (p && p.name) || "?").join(", ")); process.exit(1); }
+console.log("ok: manifest parses,", (m.pages || []).length, "page(s),", (m.products || []).length, "product(s)");
 '
 ```
 
-A parse error or a missing file is yours to fix before the checkpoint sees the manifest.
+A parse error, a missing file or a malformed product is yours to fix before the checkpoint sees the manifest.

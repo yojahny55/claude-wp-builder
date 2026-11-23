@@ -409,6 +409,8 @@ Run, in order:
    Pass `--store-pages` with every `pages[role=store]` entry as `<slug>=<store>`
    (e.g. `--store-pages shop=shop,cart=cart`): `/wp-seed` builds no WP Page for them and points
    the demo's nav items and buttons at WooCommerce's own pages.
+   On a store, also pass `--products`: `demo/products.json` if the client gave one, else the
+   manifest when `products[]` is set; its conflict, degraded and review lines go under Review.
    Set `--exclude-slugs` to the comma-joined slugs of every `pages[role=cpt-archive]` and `pages[role=store]` entry
    (e.g. `--exclude-slugs team`) so no stray WP Page is created for an archive slug — its
    URL comes from `has_archive`, and a WP Page would collide with `archive-<cpt>.php`.

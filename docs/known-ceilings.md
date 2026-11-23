@@ -461,6 +461,12 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   single product page has no WooCommerce page to point at, and a catalog store drops its cart
   and checkout links; each is listed under Review. Under Polylang every language's link goes
   to WooCommerce's single page until the Polylang bridge.
+- **Seeded products are simple or External, in one language.** `/wp-seed --products` builds no
+  variations: a product with options (size, colour) is created as a draft and listed under
+  Review, for a person to build them in WooCommerce. Products stay untranslated until the
+  Polylang bridge. The script reads the products file and its images from the host, so it needs
+  a `native` engine, like `/wp-woo-setup`. A client product is recognised by its sku or its
+  exact name; one renamed and without a sku reads as new, and is created beside it.
 - **The header cart count follows WooCommerce's announcements, not every change.** It is the
   server's count, re-read from the Store API when WooCommerce fires `added_to_cart`,
   `removed_from_cart`, `wc-blocks_added_to_cart` or, from the cart and checkout blocks,

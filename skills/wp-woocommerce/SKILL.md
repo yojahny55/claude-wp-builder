@@ -35,7 +35,13 @@ written on WooCommerce's own selectors: `references/store-selectors.md` maps eac
 demo's store page draws to the selector that carries it, measured on WooCommerce 11.1.2.
 Their links are rewired by `/wp-seed --store-pages`, which runs
 `scripts/store-links.php`: a menu item whose object is WooCommerce's page, or that page's
-permalink for a link field. Run it through `/wp-seed`, not by hand.
+permalink for a link field. Run it through `/wp-seed`, not by hand. The products those pages
+show are the manifest's `products[]`, created by `/wp-seed --products` with
+`scripts/product-seed.php` (its decisions, with no WordPress calls, are in
+`scripts/product-lib.php`, which `tests/checks/product-seed.sh` runs under bare PHP; neither is
+run by hand): simple or External products, resolved by sku and owned field by
+field like everything else `/wp-seed` writes; options (size, colour) leave a draft for review,
+because variations are not built.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the

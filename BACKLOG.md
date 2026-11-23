@@ -294,7 +294,12 @@ Server setup, permissions, and WordPress configuration.
   are rewired: `/wp-seed --store-pages` adds menu items and fills link fields with
   [WooCommerce's own pages](skills/wp-woocommerce/scripts/store-links.php)
   ([check](tests/checks/store-links.sh), [on a real store](tests/checks/store-links-integration.sh)).
-  Piece 3 is delivered. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
+  Piece 3 is delivered. Piece 4 has its first half: a demo's products are extracted into the
+  manifest's `products[]` and created by `/wp-seed --products` with
+  [WooCommerce's own classes](skills/wp-woocommerce/scripts/product-seed.php), simple or
+  External, owned field by field, with options left as a draft for review
+  ([check](tests/checks/product-seed.sh), [on a real store](tests/checks/product-seed-integration.sh)).
+  Not started, each its own spec: `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`
