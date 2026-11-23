@@ -2,6 +2,73 @@
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-11-23
+
+### Added
+
+- **Visual baselines now see colour and type.** `tests/checks/visual-baselines.sh` only
+  photographed the motion fixtures, grey boxes that show layout moving but not a recoloured
+  token or a swapped font. A colour-and-type page is now baselined at 1280 and 390 px, and
+  four mutants of it — body text two grey steps lighter, the heading's font family, the
+  button colour, the lead's size — must each differ from the baseline by more than the
+  0.1% tolerance, so the baselines cannot quietly lose that sight. A one-step text tint
+  measures 0% and is left to the computed-style checks. A failed run now also keeps the
+  rendered shots for approval, its evidence folder is ignored by git, and CI uploads it:
+  the upload step skipped it as a hidden path, so no failed visual run had ever shipped
+  its diffs.
+
+### Changed
+
+- **`/wp-audit` and `/wp-create` have room to grow again.** `/wp-audit` sat 1.5 KB and
+  `/wp-create` 2 KB under the size ceilings their `-run` checks enforce. `/wp-audit` Step 7
+  (aggregating the agents' reports: deduplication, measurement over inference, one finding
+  per defect) moved to `skills/wp-audit-run/references/aggregate.md`; `/wp-create` Steps
+  4.5 (configuring WordPress) and 4.14 (installing languages) moved to `configure.md` and
+  `languages.md` under `skills/wp-create-run/references/`. Each step keeps its heading and
+  a pointer, read when the run reaches it. `/wp-audit` is 26.1 KB of 30 KB and
+  `/wp-create` 23.9 KB of 27 KB.
+
+- **`/wp-page` and `/wp-finalize` have room to grow again.** Each sat about 700 bytes under
+  its 12 KB ceiling. On `/wp-page`, the tailwind prompt body's file ownership rule and quoted
+  author-mode prompt moved to `skills/wp-page-run/references/tailwind-prompt.md`; on
+  `/wp-finalize`, the Tailwind convention's script call and failure list moved to
+  `skills/wp-finalize-run/references/tailwind-convention.md`. Both are read only on a
+  `tailwind` theme; each command keeps the heading and the condition that sends the run
+  there. `/wp-page` is 8.6 KB and `/wp-finalize` 10.4 KB.
+
+- **`store-polylang` is signed by its author.** The plugin header now reads
+  `Author: Lacho00` with `Author URI: https://lazarosantana.dev`, so the Plugins screen
+  credits the bridge's author and links their portfolio. `tests/checks/store-polylang.sh`
+  pins both lines instead of copying the plugin repository's owner.
+
+- **`/wp-section` has room to grow again.** The command sat 196 bytes under its 16 KB
+  ceiling. Step 6.4's script search and `wp-js` dispatch moved to
+  `skills/wp-section-run/references/behaviour.md`, read only when a section is not skipped;
+  the command keeps the step's heading and its skip conditions (`--transcribe`, `--hybrid`,
+  a `cinematic` theme). The command is 15.1 KB, with 1.3 KB of headroom.
+
+- **`/wp-yolo` has room to grow again.** The command sat 8 bytes under its 35 KB ceiling,
+  so the next flag or gate would have failed `tests/checks/wp-yolo-run.sh`. The Step 6
+  report — the INCOMPLETE block, the Build Complete summary and the Resume block — moved
+  to `skills/wp-yolo-run/references/report.md`, read once the run reaches it; the command
+  keeps the rule that picks between the two reports. The command is 33.4 KB, with 2.4 KB
+  of headroom; the expanded text the checks read keeps every line of the old step.
+
+### Fixed
+
+- **`webp-on-upload` no longer fails at random under `tests/run.sh -j 8`.** Its check for
+  leftover temporary files ran `find` over the shared `/tmp` while parallel checks deleted
+  their own files there; `find` then exited 1, and under `set -e` the check stopped with no
+  message (4 of 47 runs during a parallel suite). Each case now runs PHP with a private
+  `TMPDIR` and looks only there, so a leftover file still fails it and a neighbour cannot.
+
+- **`woo-launch-integration` no longer fails at random on the wrong-host assertion.** Its
+  snapshot of the store's options counted `cron` and Action Scheduler's
+  `action_scheduler_lock_*`, which WordPress rewrites on its own while the fixture serves
+  requests, so "a wrong --confirm changed the store" failed once with no change to the
+  launch (a rerun passed). Those scheduler options are left out, any other changed option
+  still fails, and a failure now names the options that changed.
+
 ## [1.41.0] - 2026-11-23
 
 ### Added
