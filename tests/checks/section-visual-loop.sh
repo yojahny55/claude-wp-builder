@@ -36,7 +36,12 @@ need_token "$ref" '**Take the value from the demo, never from the pixels.**'
 need_token "$ref" '`not CSS: <reason>`'
 need_token "$ref" 'three fix rounds done'
 need_token "$ref" 'fell by less than half a point'
-need_token "$ref" 'with a new `--out`'
+need_token "$ref" 'directory so each round'"'"'s images stay apart'
+need_token "$ref" 'content not seeded yet'
+need_token "$ref" '**Before each round, keep a copy**'
+need_token "$ref" '**A round that made it worse is undone.**'
+need_token "$ref" '**Never rename the section'"'"'s root class or its block.**'
+need_token "$ref" "meta_key LIKE %s"
 
 # The ref names the fields and exit codes section-diff really has.
 for f in diffPercent widthDeltaPercent heightDeltaPercent; do
