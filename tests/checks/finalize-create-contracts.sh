@@ -45,7 +45,7 @@ for t in 'never Adopt Mode' 'no yes, no 4.2 and no 4.4'; do
 done
 grep -Fq 'references/overwrite.md` now and follow it first.' "$cr" || err "$cr 4.2 does not send Overwrite to its reference"
 grep -Fq 'core download --force --skip-content' "$cr" || err "$cr 4.2 lacks --skip-content"
-grep -Fq 'add `--force` (`wp-config.php` exists)' "$cr" || err "$cr 4.5 lacks config create --force on Overwrite"
+grep -Fq 'add `--force` (`wp-config.php` exists)' skills/wp-create-run/references/configure.md || err "the /wp-create Step 4.5 reference lacks config create --force on Overwrite"
 grep -Fq 'reuse `database.*`' "$cr" || err "$cr Step 3 does not reuse the manifest database on Overwrite"
 grep -Fq 'Never after Overwrite.' "$cr" || err "$cr Adopt Mode section does not exclude Overwrite"
 grep -Fq 'except in Overwrite, which follows' "$cr" || err "$cr partial-state note ignores Overwrite"

@@ -21,7 +21,9 @@ read it whole and follow it in order.
 | 1 | [references/detect-output.md](references/detect-output.md) | The JSON structure `wp-env-setup.sh detect` prints |
 | 4.2 | [references/overwrite.md](references/overwrite.md) | Overwrite on an existing manifest: export to the host, confirmation, `core download --force`, `db reset --yes` |
 | 4.3 | [references/env-templates.md](references/env-templates.md) | The template for each environment, the `{{placeholder}}` values, port auto-assignment, the validation |
+| 4.5 | [references/configure.md](references/configure.md) | `wp config create`, `FS_METHOD direct` and where not to carry it, `WP_ENVIRONMENT_TYPE local`, the validation of each |
 | 4.10 | [references/plugin-profile.md](references/plugin-profile.md) | Profile validation, installing each plugin, required versus optional outcomes, `plugins.degraded` |
+| 4.14 | [references/languages.md](references/languages.md) | Full locale codes (a bare `es` is skipped with exit 0), switching the site language, the validation |
 | 4.15 | [references/permissions.md](references/permissions.md) | The PHP user, the inherited default ACL on `wp-content`, validation and the `setfacl` failure notes |
 | 5 | [references/manifest.md](references/manifest.md) | The `.wp-create.json` written to the project root, its fields and the validation that follows |
 

@@ -57,7 +57,7 @@ grep -qE '^\| PHP version below the floor \(`>= 8\.2`' "$STD" || fail "$STD: the
 
 # --- same defect, one owner ---
 grep -q 'Same defect, one owner' "$STD" || fail "$STD lacks the Same defect, one owner table"
-grep -q 'Same defect, one owner' "$CMD" || fail "$CMD does not mention the Same defect table"
+grep -q 'Same defect, one owner' skills/wp-audit-run/references/aggregate.md || fail "the /wp-audit Step 7 reference does not mention the Same defect table"
 file_of() {
   case "$1" in
     SEC-*) echo "$SEC";; PERF-*) echo "$PERF";; WP-*) echo "$WP";;
