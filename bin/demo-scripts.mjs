@@ -42,12 +42,14 @@ const JS_TYPES = new Set([
 
 /** Inline JavaScript scripts of an HTML string: [{ line, body }]. */
 export function inlineScripts(html) {
-  // Blank comments out instead of deleting them, so line numbers stay true.
-  const text = html.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
+  // One left-to-right sweep that matches a comment or a script, whichever starts first. A
+  // comment swallows a script inside it; a `<!--` inside a script body (a string, a legacy
+  // wrapper) is already consumed by that script and never starts a comment.
   const out = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+  const re = /<!--[\s\S]*?-->|<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
   let m;
-  while ((m = re.exec(text)) !== null) {
+  while ((m = re.exec(html)) !== null) {
+    if (m[0].startsWith('<!--')) continue;
     const attrs = m[1];
     if (/(?:^|\s)src\s*=/i.test(attrs)) continue;
     const type = (attrs.match(/(?:^|\s)type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i) || [])
@@ -56,7 +58,7 @@ export function inlineScripts(html) {
     if (!JS_TYPES.has((type || '').trim().toLowerCase())) continue;
     const body = m[2];
     if (body.trim() === '') continue;
-    const line = text.slice(0, m.index).split('\n').length;
+    const line = html.slice(0, m.index).split('\n').length;
     out.push({ line, body });
   }
   return out;

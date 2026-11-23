@@ -71,6 +71,9 @@ cat >"$tmp/page.html" <<'HTML'
 document.querySelectorAll('.hero-carousel').forEach(function (el) { el.dataset.ok = '1'; });
 </script>
 <script type="module">import './app.js';</script>
+<script>var legacy = "<!--";</script>
+<script>document.querySelector('.after-legacy').hidden = false;</script>
+<p>--></p>
 </body></html>
 HTML
 out=$(node "$tool" "$tmp/page.html" --match 'hero-carousel') || fail "demo-scripts found no inline script naming hero-carousel"
@@ -79,7 +82,8 @@ printf '%s\n' "$out" | grep >/dev/null -c '<section' && fail "demo-scripts print
 printf '%s\n' "$out" | grep >/dev/null -c 'ld+json\|"name"' && fail "demo-scripts printed JSON-LD: $out"
 printf '%s\n' "$out" | grep >/dev/null -c 'remove()' && fail "demo-scripts printed a commented-out script: $out"
 printf '%s\n' "$out" | grep >/dev/null -c '^// inline script 1, line 8$' || fail "demo-scripts header or line number is wrong: $out"
-[ "$(node "$tool" "$tmp/page.html" | grep -c '^// inline script')" = 2 ] || fail "demo-scripts without --match must print both inline scripts"
+[ "$(node "$tool" "$tmp/page.html" | grep -c '^// inline script')" = 4 ] || fail "demo-scripts without --match must print all four inline scripts"
+node "$tool" "$tmp/page.html" --match 'after-legacy' >/dev/null || fail "a <!-- inside one script hid the next script from demo-scripts"
 rc=0; node "$tool" "$tmp/page.html" --match 'no-such-class' >/dev/null || rc=$?
 [ "$rc" = 1 ] || fail "demo-scripts must exit 1 when nothing matches (got $rc)"
 rc=0; node "$tool" "$tmp/missing.html" >/dev/null 2>&1 || rc=$?
