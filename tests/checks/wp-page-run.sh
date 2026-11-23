@@ -8,8 +8,11 @@
 #
 # The command is organized by page type, so the anchor is the "### Type: <name>" heading
 # (a reference titles itself "# /wp-page — Type: <name>"), and a pointer must sit before the
-# next "###" or "##" heading. Ceiling: the command is 10.8 KB with the five types moved out,
-# so 12 KB leaves room for a few added lines but fails if a type's detail is pasted back in.
+# next heading. The one exception is the tailwind prompt body, which sits at "####" inside the
+# CSS agent routing block (wp-commands-tailwind.sh exempts that block down to the next "###"),
+# so its anchor is "#### The `tailwind` prompt body". Ceiling: the command is 8.6 KB with the
+# five types and the tailwind prompt body moved out, so 12 KB leaves room for a few added
+# lines but fails if a type's detail is pasted back in.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail=0
@@ -34,9 +37,11 @@ for f in "$refs"/*.md; do
   # The reference names its step, and that step heading still exists in the command.
   step=$(sed -n '1s/^# \/wp-page — //p' "$f")
   [ -n "$step" ] || { err "$f has no '# /wp-page — Type: <name>' title"; continue; }
-  grep -Fxq -- "### ${step}" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
+  h="### ${step}"
+  grep -Fxq -- "$h" "$cmd" || h="#### ${step}"
+  grep -Fxq -- "$h" "$cmd" || err "$f belongs to $step, which $cmd no longer has"
   # The pointer sits under that step, not elsewhere in the command.
-  awk -v s="### ${step}" -v b="references/$b" '
+  awk -v s="$h" -v b="references/$b" '
     $0 == s { on = 1; next } /^##+ / { on = 0 } on && index($0, b) { found = 1 }
     END { exit !found }' "$cmd" || err "$cmd points to $b outside $step"
 done
@@ -51,9 +56,12 @@ done
 awk '/^$/ { n = 0; next } /skills\/wp-page-run\/references\// { if (++n > 1) bad = 1 }
   END { exit bad }' "$cmd" || err "$cmd names two wp-page-run references in one paragraph"
 
-# The command stays a map. Steps 1 and 2, the CSS agent routing, the tailwind prompt body and
-# the generic and custom types stay whole, because the run needs them in view and the
-# dispatch-site walk in wp-commands-tailwind.sh reads them there.
+# The command stays a map. Steps 1 and 2, the CSS agent routing and the generic and custom
+# types stay whole, because the run needs them in view and the dispatch-site walk in
+# wp-commands-tailwind.sh reads them there. The tailwind prompt body keeps its heading and
+# the paragraph that says when it replaces a dispatch site; its file ownership rule and
+# quoted prompt, read only on a tailwind theme, live in a reference that the walk reads
+# through the expansion.
 size=$(wc -c < "$cmd")
 [ "$size" -le 12288 ] || err "$cmd is $size bytes; move long step detail to $refs"
 

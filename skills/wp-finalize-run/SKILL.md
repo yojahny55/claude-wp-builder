@@ -22,6 +22,7 @@ read it whole and follow it in order.
 | Check 4, Theme Structure | [references/theme-structure.md](references/theme-structure.md) | Required theme files and headers, menu locations per strategy, favicon, login branding |
 | Check 7, WP-CLI Runtime Validation | [references/wp-cli-runtime.md](references/wp-cli-runtime.md) | Runtime checks against the live site: pages, menus, options, authors |
 | Check 8, GEO and agent-readiness | [references/geo.md](references/geo.md) | The report-only GEO and agent-readiness scan |
+| Tailwind convention, `tailwind` template only | [references/tailwind-convention.md](references/tailwind-convention.md) | The `bin/tailwind-native-check.sh` call through `${CLAUDE_PLUGIN_ROOT}` and what fails the delivery |
 | Demo-parity gate, Layer 1 | [references/parity-static.md](references/parity-static.md) | Static comparison of the demo against the theme: tokens, fonts, backgrounds, collisions |
 | Demo-parity gate, Layer 2 | [references/parity-wpcli.md](references/parity-wpcli.md) | The WP-CLI layer when WordPress is reachable: content and media parity |
 | Demo-parity gate, Layer 3 | [references/parity-visual.md](references/parity-visual.md) | Measured visual parity with `claude-in-chrome`: computed styles, hard and soft deltas |
