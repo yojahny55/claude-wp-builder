@@ -126,6 +126,23 @@ switched on, and a catalog gets catalog mode. It shows a dry run first, reports 
 as set, already right, the client's, or degraded, and can be re-run at any time. `/wp-create`
 runs it at the end when a store profile was chosen.
 
+### `/wp-woo-verify`
+
+```
+/wp-woo-verify [project-path]                    # setup's dry run, store pages, shop, cart; writes nothing
+/wp-woo-verify [project-path] --order            # also a cash-on-delivery order on a local store, deleted afterwards
+/wp-woo-verify [project-path] --url <base-url>   # check the site at another address (a port, a host resolved another way)
+```
+
+Checks a store from outside with `bin/woo-verify.mjs`: `woo-setup.php`'s dry run plans
+nothing, the shop, cart, checkout and account pages answer (a catalog's cart and checkout send
+the visitor to the shop), the shop lists a published product, and the Store API puts a product
+in a cart and takes it out (a catalog refuses it). The cart session it opens is deleted. With
+`--order`, and only on a local site whose tier sells, with cash on delivery on and no other
+order, it places one order through the Store API, checks the new-order email was sent, then
+cancels the order, so the stock and sales count go back, and deletes it for good. Exit 0 all
+passed, 1 a check failed or `--order` was refused, 2 the site or WP-CLI did not answer.
+
 ---
 
 ## Path A

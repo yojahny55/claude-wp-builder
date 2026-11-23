@@ -299,8 +299,13 @@ Server setup, permissions, and WordPress configuration.
   [WooCommerce's own classes](skills/wp-woocommerce/scripts/product-seed.php), simple or
   External, owned field by field, with options left as a draft for review
   ([check](tests/checks/product-seed.sh), [on a real store](tests/checks/product-seed-integration.sh)).
-  Not started, each its own spec: `/wp-woo-verify`, the store audit and launch step, the Polylang
-  bridge, subscriptions, bookings.
+  Its second half too: [`/wp-woo-verify`](commands/wp-woo-verify.md) checks a store from outside
+  with [its tool](bin/woo-verify.mjs) — setup's dry run plans nothing, the store pages answer, the
+  shop lists products, a Store API cart takes one — and with `--order`, on a local store with no
+  other order, places a cash-on-delivery order, sees its email sent, and deletes it with the stock
+  back ([check](tests/checks/wp-woo-verify.sh), [on a real store](tests/checks/woo-verify-integration.sh)).
+  Piece 4 is delivered. Not started, each its own spec: the store audit and launch step, the
+  Polylang bridge, subscriptions, bookings.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`
   [The integration check](tests/checks/wp-woo-setup-integration.sh) failed once at "setup

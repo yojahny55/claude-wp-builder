@@ -53,6 +53,9 @@ load-bearing gates rather than helpers:
 - `store-layer-check.mjs` — `/wp-yolo`'s store layer: whether the `Section: Store demo` of a
   theme's `store.css` holds rules, all scoped to a store body class, without `!important`, under
   an untouched base.
+- `woo-verify.mjs` — `/wp-woo-verify`: a store checked from outside (setup's dry run, the store
+  pages, the shop, a Store API cart, and with `--order` a local test order it deletes), with
+  `skills/wp-woocommerce/scripts/woo-verify.php` on the WordPress side.
 - `decision-sheet.mjs` — the approval page for `design_impact` findings and the parser for its
   answers.
 - `audit-report.mjs` — renders an audit run into a dated Markdown and HTML deliverable.
