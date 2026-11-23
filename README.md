@@ -543,6 +543,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-template` | PHP/WordPress template specialist — generates template parts, pages, header, footer |
 | `wp-css` | CSS design system specialist — BEM naming, custom properties, responsive |
 | `wp-tailwind` | Tailwind specialist — demo conversion and section authoring on the `template=tailwind` path, replacing `wp-css` |
+| `wp-js` | JavaScript behaviour specialist — ports a demo section's script into a guarded module of the theme bundle, wired into `index.js` and rebuilt (`/wp-section` Step 6.4) |
 | `wp-acf` | ACF/SCF field architect — programmatic field definitions with bilingual support |
 | `wp-cf7` | Contact Form 7 specialist — forms per language, branded mail templates, and the seeder that carries the form body |
 | `wp-normalize` | Demo-folder analyzer — turns an arbitrary multi-page site into the canonical delimited demo plus a build manifest |

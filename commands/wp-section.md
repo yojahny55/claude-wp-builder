@@ -177,6 +177,26 @@ If not present, add the `get_template_part()` call inside the `<main>` element, 
 
 If the page template does not exist yet, create it with `get_header()`, `<main>`, the `get_template_part()` call, `</main>`, and `get_footer()`.
 
+## Step 6.4: Behaviour (`wp-js`)
+
+A section whose demo has a script — a carousel, a gallery, tabs, an accordion, a filter, a
+form check — is not built until the script is. Skip this step under `--transcribe` (the
+`/wp-yolo` run ports every script once, at its Step 4.6), under `--hybrid`, and on a
+`cinematic` theme. Otherwise find the scripts that touch the section: inline `<script>`
+blocks in the demo page, and every `demo/**/*.js` (and `src="…js"` the page loads) that
+names the section root's classes, ids or `data-` attributes:
+
+```bash
+grep -rlE '<root-class>|<child-ids-or-data-attributes>' demo --include=*.js --include=*.html
+```
+
+None: skip, and say "no behaviour" in the summary. Some: dispatch **wp-js** with the slug,
+the theme directory, the template part path, the demo section's markup and those scripts.
+It writes `assets/js/src/sections/<slug>.js`, wires it into `index.js`, adds `data-` hooks to
+the template part, and rebuilds the bundle. A `BLOCKED:` return (a library the theme does not
+have, no `index.js`) goes into the summary verbatim with the files it touched; the section
+is reported as built without its behaviour, never as finished.
+
 ## Step 6.5: Rebuild Tailwind CSS
 
 On `Template: tailwind` the site enqueues only the compiled `assets/css/dist/main.css`, so
@@ -222,6 +242,7 @@ Files created/updated:
   - components/<page-slug>.css or utilities/site.css (only if a rule was needed) [tailwind only]
   - <page-template>.php (added get_template_part call)
   - Blog templates: built by /wp-page blog | skipped (<reason>) [blog sections, Step 6.7]
+  - Behaviour: assets/js/src/sections/<slug>.js (wp-js) | no behaviour | BLOCKED: <reason> [Step 6.4]
 
 Fields registered:
   - <list of field names>

@@ -173,7 +173,7 @@ without any flag on this command:
 
 - **opus** — planning/analysis whose output steers the whole build: `wp-normalize`, `wp-context`,
   `wp-research`.
-- **sonnet** — code authoring and judgment audits: `wp-template`, `wp-css`, `wp-tailwind`,
+- **sonnet** — code authoring and judgment audits: `wp-template`, `wp-css`, `wp-tailwind`, `wp-js`,
   `wp-cinematic`, `wp-agentic-surfaces`,
   `wp-audit-a11y|geo|performance|practices|security|seo|ux`,
   `wp-audit-rankmath` (schema conflicts, title quality, JSON-LD merge and the Polylang route are judgment, not mechanical config).
