@@ -19,7 +19,7 @@ channels, `store.checkout` (with `store.checkout_reason`) the checkout type, and
 
 | `store.tier` | What it is | Profile |
 |---|---|---|
-| `catalog` | Products and prices, nothing purchasable. Runs on WooCommerce with buying switched off by `store-kit`, so moving up a tier keeps every product, with no migration. `store.enquiry` records which enquiry channels apply — `form`, `where-to-buy`, `whatsapp` — and only `where-to-buy` works out of the box, as WooCommerce's External product type: no starter theme renders the enquiry form or the WhatsApp button. | `${CLAUDE_PLUGIN_ROOT}/templates/profiles/woo-catalog.json` |
+| `catalog` | Products and prices, nothing purchasable. Runs on WooCommerce with buying switched off by `store-kit`, so moving up a tier keeps every product, with no migration. `store.enquiry` records which enquiry channels apply — `form`, `where-to-buy`, `whatsapp` — `where-to-buy` works as WooCommerce's External product type, and `/wp-woo-setup` installs `templates/store/store-enquiry.php` into the theme for the WhatsApp button and the enquiry form. | `${CLAUDE_PLUGIN_ROOT}/templates/profiles/woo-catalog.json` |
 | `store` | Cart, block checkout, Stripe in test mode, shipping, tax, SMTP, Turnstile, and cookie consent where the market needs it. | `${CLAUDE_PLUGIN_ROOT}/templates/profiles/woo-store.json` |
 | `full` | `store` plus abandoned-cart email, email marketing, reviews, search and filters, swatches, wishlist, and Google and Meta feeds. | `${CLAUDE_PLUGIN_ROOT}/templates/profiles/woo-full.json` |
 
@@ -27,6 +27,10 @@ channels, `store.checkout` (with `store.checkout_reason`) the checkout type, and
 and the add-ons (digital downloads, print-on-demand, wholesale, multilingual). Read it before
 adding, removing or swapping a plugin in a store profile: `tests/checks/wp-profiles.sh` fails
 a profile plugin with no row under Picks, or one listed under Avoid.
+
+A demo's store pages (shop, product, cart, checkout, account) are `role: store` in the
+`/wp-yolo` manifest: WooCommerce renders those URLs, so no WP Page or section build comes from
+them.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the

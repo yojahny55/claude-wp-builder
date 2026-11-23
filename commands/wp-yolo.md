@@ -344,6 +344,9 @@ Drive the existing commands/agents in this exact order, reading everything from 
 7. **`cpt-archive` pages** — no WP Page is created for these (their archive URL is
    `has_archive`, already wired by `/wp-cpt` in step 2). Skip page creation; note them in
    the final report as "archive of `<cpt>`, built by /wp-cpt".
+   **`store` pages** (`pages[role=store]`) — same: no WP Page, no `/wp-section`. WooCommerce
+   renders them. Report each as "store page (`<store>`), rendered by WooCommerce"; with no
+   `store` block in `.wp-create.json`, add "run /wp-woo-setup first".
 8. **Blog** — if any `pages[role=blog]` entry exists, run `/wp-page blog`.
 9. **Mandatory system pages — always, regardless of demo content:**
    - `/wp-page 404`
@@ -392,9 +395,11 @@ Run, in order:
    wire them to fields, and build menus from the nav.
    Pass the manifest's top-level `assets[]` (role-tagged: `logo` / `nav-graphic` / `hero` /
    `content`) through so `/wp-seed` seeds each image by its role instead of guessing.
-   Set `--exclude-slugs` to the comma-joined slugs of every `pages[role=cpt-archive]` entry
+   Set `--exclude-slugs` to the comma-joined slugs of every `pages[role=cpt-archive]` and `pages[role=store]` entry
    (e.g. `--exclude-slugs team`) so no stray WP Page is created for an archive slug — its
    URL comes from `has_archive`, and a WP Page would collide with `archive-<cpt>.php`.
+   Then, with WooCommerce active, add each `store` page the demo nav links to as a custom
+   menu item to `wc_get_page_permalink('<store>')` (`account` is `myaccount`; `product` gets none).
 2. **Create CPT posts** — `/wp-seed` does not create CPT posts, so after it, for each
    `contentTypes[]` entry execute its seeder `inc/seed/<name>.php` (emitted by that CPT's
    `/wp-cpt` run in Phase 2) via the project's WP-CLI wrapper — e.g.

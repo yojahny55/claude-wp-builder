@@ -22,7 +22,8 @@ normalize pass reads those decisions instead of re-deriving them from the markup
   "pages": [
     {
       "slug": "index",
-      "role": "home" | "inner" | "cpt-archive" | "blog",
+      "role": "home" | "inner" | "cpt-archive" | "blog" | "store",
+      "store": "shop | product | cart | checkout | account — only on a store page",
       "sections": [
         { "name": "<the delimiter's name, verbatim>",
           "kind": "static" | "contact" | "cpt-teaser",
