@@ -61,7 +61,7 @@ node -e '
   });' || fail "section-diff.mjs exit codes no longer match the table in $ref"
 
 # section-seeded.php, run for real against stubbed ACF: exact group fields, an empty repeater
-# ("0" in meta, an empty array from get_field) is empty, and a group that is not there is -1.
+# ("0" in meta) and a field with only a default_value are empty, and a group that is not there is -1.
 require_tool php
 seeded=skills/wp-section-run/scripts/section-seeded.php
 tmp=$(mktemp -d)
@@ -76,11 +76,17 @@ if ( 'noacf' !== $argv[3] ) {
 		if ( 'nogroup' === $GLOBALS['scenario'] || 'group_hero' !== $key ) { return false; }
 		return array( array( 'name' => 'hero_title' ), array( 'name' => 'hero_items' ), array( 'name' => 'hero_image' ) );
 	}
-	function get_field( $name, $page ) {
+	// What ACF stores: a repeater's meta is its row count ("0" when empty); an unseeded field
+	// has no meta at all, whatever default_value get_field() would hand back for it.
+	function hero_meta() {
 		$filled = 'filled' === $GLOBALS['scenario'];
-		$v = array( 'hero_title' => $filled ? 'Welcome' : '', 'hero_items' => $filled ? array( array( 'x' => 1 ) ) : array(), 'hero_image' => $filled ? 12 : false );
-		return $v[ $name ];
+		return $filled
+			? array( 'hero_title' => 'Welcome', 'hero_items' => '2', 'hero_image' => '12' )
+			: array( 'hero_title' => '', 'hero_items' => '0' );
 	}
+	function metadata_exists( $type, $page, $name ) { return array_key_exists( $name, hero_meta() ); }
+	function get_post_meta( $page, $name, $single ) { $m = hero_meta(); return isset( $m[ $name ] ) ? $m[ $name ] : ''; }
+	function get_field( $name, $page ) { return 'default from ACF'; }
 }
 require getenv( 'SEEDED' );
 PHP
