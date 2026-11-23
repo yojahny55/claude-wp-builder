@@ -38,7 +38,8 @@ languages. Then read, before writing anything:
 **Port this section only.** A shared demo script (one `main.js` for the whole page) is handed
 to you whole: port only the parts that act on this section's root or its descendants, and
 list the rest as "not ported: belongs to <other section or chrome>". A behaviour a module
-already covers is not ported twice.
+already covers is not ported twice. A library's own file (`*.min.js`, anything under
+`vendor/` or `node_modules/`) is never ported or copied: it is a dependency (see Wiring 2).
 
 ## What to write
 
@@ -74,9 +75,12 @@ One module per behaviour: `assets/js/src/sections/<slug>.js`, exporting `init<Na
 
 1. In `index.js`, import the module and call its `init` inside `startWidgets` (or the
    equivalent DOM-ready starter the file uses). One import, one call. If the build in step 3
-   fails, or you return `BLOCKED` after this edit, take the import and the call back out of
-   `index.js` before returning: a module the bundle cannot build breaks every script on the
-   site, not just this section's.
+   fails, or you return `BLOCKED` after this edit, undo the whole port before returning:
+   take the import and the call back out of `index.js`, delete
+   `assets/js/src/sections/<slug>.js`, and remove the `data-` hooks you added to the template
+   part. A module the bundle cannot build breaks every script on the site, not just this
+   section's, and a half port left behind is "restored" by the next run as if it worked.
+   List the reverted files in the return as `reverted: <files>`.
 2. **Libraries.** Use a library (Swiper, Splide, GSAP, AOS…) only when the demo's script
    uses it, and only from `package.json`. GSAP is already there. A library the demo uses
    that `package.json` lacks: do not add a CDN `<script>` and do not run `npm install`;

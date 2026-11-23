@@ -45,6 +45,8 @@ load-bearing gates rather than helpers:
   filter: the measurement behind "a tag swap is a visual change".
 - `section-diff.mjs` — one built section against its demo section, pixel by pixel per viewport
   (pixelmatch over the shared area, width and height deltas apart), with demo, site and diff images.
+- `demo-scripts.mjs` — the inline JavaScript bodies of a demo page (no `src`, no JSON-LD,
+  comments dropped), optionally filtered by a regex: which scripts touch a section.
 - `theme-screenshot.mjs` — the theme's 1200x900 `screenshot.png` from the built homepage.
 - `decision-sheet.mjs` — the approval page for `design_impact` findings and the parser for its
   answers.

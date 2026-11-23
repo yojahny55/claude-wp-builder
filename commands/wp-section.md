@@ -184,11 +184,15 @@ form check — is not built until the script is. Skip this step under `--transcr
 `/wp-yolo` run ports every script once, in its behaviour-carry step), under `--hybrid`, and on a
 `cinematic` theme. Otherwise find the scripts that touch the section. A hit in the page's
 markup is not one — the section's own HTML always names its classes — so search scripts only:
-the `.js` files, and the inline `<script>` blocks of the demo page, extracted first:
+the demo's own `.js` files (not minified or vendored libraries), and the inline `<script>`
+bodies of the demo page, which `bin/demo-scripts.mjs` extracts (no `src`, no JSON-LD; exit 0
+printed, 1 none matching):
 
 ```bash
-grep -rlE '<root-class>|<child-ids-or-data-attributes>' demo --include=*.js
-sed -n '/<script\b/,/<\/script>/p' demo/<page>.html | grep -cE '<root-class>|<child-ids-or-data-attributes>'
+grep -rlE '<root-class>|<child-ids-or-data-attributes>' demo --include=*.js \
+  --exclude=*.min.js --exclude-dir=vendor --exclude-dir=node_modules
+bash -c 'node "$1/bin/demo-scripts.mjs" "$2" --match "$3"' _ "${CLAUDE_PLUGIN_ROOT}" \
+  'demo/<page>.html' '<root-class>|<child-ids-or-data-attributes>'
 ```
 
 None: skip, and say "no behaviour" in the summary. Some: dispatch **wp-js** with the slug,
