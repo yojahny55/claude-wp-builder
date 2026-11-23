@@ -3,9 +3,10 @@
 # stock across a product's translations, store pages and customer emails per language. This
 # pins what it must keep being, and how /wp-woo-setup and /wp-polylang reach it:
 #   - its no-WordPress unit tests pass (tests/store-polylang/run.php);
-#   - every file refuses direct access, uninstall removes every option it owns, its identity
-#     matches plugin.json (the audit's wp.org lookup ties a slug to a plugin by author and URI),
-#     and it declares only what the fixture proves;
+#   - every file refuses direct access, uninstall removes every option it owns, its identity is
+#     fixed (Author and Author URI name its author; Plugin URI matches plugin.json, and the
+#     audit's wp.org lookup ties a slug to a plugin by author and URI), and it declares only
+#     what the fixture proves;
 #   - it stands down beside another bridge, because two take every sale twice from stock;
 #   - store-kit-sync copies it, /wp-woo-setup installs it only on a Polylang site and reads
 #     which bridge runs, setup turns on product translation only on a store with no products,
@@ -40,9 +41,11 @@ hdr() { sed -n "s/^ \* $1: *//p" "$main" | sed -n 1p; }
 [ "$(hdr 'Update URI')" = "false" ] || fail "store-polylang must set Update URI: false, or WordPress may offer a same-named plugin as an update"
 [ "$(hdr 'Requires Plugins')" = "polylang, woocommerce" ] || fail "store-polylang must declare Requires Plugins: polylang, woocommerce"
 [ "$(hdr 'Requires PHP')" = "7.4" ] || fail "store-polylang must declare the 7.4 floor"
-author=$(node -e 'console.log(require("./.claude-plugin/plugin.json").author.name)')
+# store-polylang is signed by its own author, not by the plugin repository's owner: the
+# Author header names them and Author URI links their portfolio.
 repo=$(node -e 'console.log(require("./.claude-plugin/plugin.json").repository)')
-[ "$(hdr 'Author')" = "$author" ] || fail "store-polylang's Author is not plugin.json's author.name ($author)"
+[ "$(hdr 'Author')" = "Lacho00" ] || fail "store-polylang's Author is not Lacho00"
+[ "$(hdr 'Author URI')" = "https://lazarosantana.dev" ] || fail "store-polylang's Author URI is not its author's portfolio"
 [ "$(hdr 'Plugin URI')" = "$repo" ] || fail "store-polylang's Plugin URI is not plugin.json's repository ($repo)"
 v=$(hdr 'Version')
 grep -Fq "define( 'STORE_PLL_VERSION', '$v' );" "$main" || fail "STORE_PLL_VERSION does not match the Version header ($v)"
