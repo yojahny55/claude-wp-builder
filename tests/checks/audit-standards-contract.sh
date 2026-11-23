@@ -23,7 +23,7 @@ has() { case "$flat" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
 for row in '| **CRITICAL** |' '| **WARNING** |' '| **INFO** |'; do
   grep -Fq "$row" "$k" || fail "$k lost the severity row $row"
 done
-for p in '`SEC-NNN`' '`SEO-NNN`' '`A11Y-NNN`' '`PERF-NNN`' '`WP-NNN`' '`UX-NNN`' '`GEO-Dnn`'; do
+for p in '`SEC-NNN`' '`SEO-NNN`' '`A11Y-NNN`' '`PERF-NNN`' '`WP-NNN`' '`UX-NNN`' '`STORE-NNN`' '`GEO-Dnn`'; do
   grep -Fq "| $p" "$k" || fail "$k lost the prefix row for $p"
 done
 grep -Fq '| `A11Y-AXE-*`, `PERF-LH-*` | Evidence rows from the browser suite — measurements of an existing criterion, never criteria of their own |' "$k" \

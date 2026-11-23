@@ -117,7 +117,10 @@ q 'update_option( "woocommerce_currency", "USD" );'
 
 # --- --order: the email, the deletion, the stock ------------------------------------------------
 before=$(stock)
+# No mail transport, whatever this machine's PHP would deliver to.
+cp tests/fixtures/wp/mail-fail.php "$DIR/wp-content/mu-plugins/00-mail-fail.php"
 got=$(verify --order)
+rm -f "$DIR/wp-content/mu-plugins/00-mail-fail.php"
 has "$got" 'fail email: Email "New order" failed to send'
 case "$(last "$got")" in *" | 1") ;; *) fail "a failed new-order email did not exit 1: $got" ;; esac
 has "$got" 'pass cleanup: order '

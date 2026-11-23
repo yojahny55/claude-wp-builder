@@ -19,7 +19,7 @@ Add or update the `audit` key in the JSON:
   "audit": {
     "last_run": "<ISO 8601 timestamp>",
     "security_level": "<basic|recommended|maximum>",
-    "categories_run": ["security", "seo", "a11y", "performance", "best-practices", "geo", "usability"],
+    "categories_run": ["security", "seo", "a11y", "performance", "best-practices", "geo", "usability", "store"],
     "checks_run": {
       "security": ["SEC-001", "SEC-002", "SEC-036"],
       "geo": ["GEO-A11"],

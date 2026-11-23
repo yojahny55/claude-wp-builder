@@ -21,11 +21,11 @@ done
 for n in wp-template wp-css wp-acf wp-cf7 wp-cinematic wp-tailwind wp-agentic-surfaces \
          wp-context wp-normalize \
          wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-practices \
-         wp-audit-security wp-audit-ux; do
+         wp-audit-security wp-audit-store wp-audit-ux; do
   inc "agents/$n.md" 'BLOCKED: <reason>'
 done
 for n in wp-audit-a11y wp-audit-seo wp-audit-geo wp-audit-performance wp-audit-practices \
-         wp-audit-security wp-audit-ux; do
+         wp-audit-security wp-audit-store wp-audit-ux; do
   inc "agents/$n.md" '"blocked": "<reason>"'
 done
 # The parent consumes the blocked key: one re-dispatch, still INCOMPLETE, reason named in the report.

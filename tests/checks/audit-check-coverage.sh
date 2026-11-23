@@ -75,6 +75,7 @@ A11Y agents/wp-audit-a11y.md
 PERF agents/wp-audit-performance.md
 GEO agents/wp-audit-geo.md
 UX skills/wp-audit-ux-standards/SKILL.md
+STORE agents/wp-audit-store.md
 PAIRS
 
 # Usability keeps its catalog in its skill's table, not in its agent. The command used to

@@ -2,7 +2,7 @@
 /**
  * woo-verify.mjs: check that a WooCommerce store set up by /wp-woo-setup works, from the outside.
  *
- * Usage: woo-verify.mjs <project-path> [--url <base-url>] [--order]
+ * Usage: woo-verify.mjs <project-path> [--url <base-url>] [--order] [--read-only] [--tier <tier>]
  *
  * Reads the `store` block and `wp_cli.wrapper` from <project-path>/.wp-create.json, then:
  *   setup      woo-setup.php's dry run plans nothing: the store still matches its block
@@ -18,6 +18,11 @@
  *              with orders is a merchant's, and the new-order email would reach them.
  *
  * Without --order it writes nothing to the store: a cart session the Store API opens is deleted.
+ * --read-only skips the cart check too, so the run writes nothing at all, not even that session:
+ * /wp-audit passes it on a report-only run. It cannot be combined with --order.
+ * --tier catalog|store|full names the tier of a store with no `store` block (one /wp-woo-setup
+ * never set up, such as an adopted merchant's): the setup check is skipped and --order refused,
+ * because both need the block. With a block, the block's tier is the tier and --tier is refused.
  * --url replaces the site's home URL (a `wp server` port, a host the machine resolves another
  * way); with --order it must be the home URL's host or loopback, and the cart check's session must
  * turn up in the database WP-CLI reads, or no order is placed: the clean-up runs through WP-CLI. A local site's certificate is not verified; any other site's is.
@@ -39,7 +44,7 @@ import './lib/stdio-blocking.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SETUP = join(ROOT, 'skills/wp-woocommerce/scripts/woo-setup.php');
 const HELPER = join(ROOT, 'skills/wp-woocommerce/scripts/woo-verify.php');
-const USAGE = 'usage: woo-verify.mjs <project-path> [--url <base-url>] [--order]';
+const USAGE = 'usage: woo-verify.mjs <project-path> [--url <base-url>] [--order] [--read-only] [--tier catalog|store|full]';
 
 function usage(msg) {
   process.stderr.write(`${msg ? `${msg}\n` : ''}${USAGE}\n`);
@@ -50,9 +55,16 @@ const argv = process.argv.slice(2);
 let project = '';
 let baseUrl = '';
 let order = false;
+let readOnly = false;
+let tierFlag = '';
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--order') order = true;
+  else if (a === '--read-only') readOnly = true;
+  else if (a === '--tier') {
+    tierFlag = argv[++i] || '';
+    if (!['catalog', 'store', 'full'].includes(tierFlag)) usage('--tier needs catalog, store or full');
+  }
   else if (a === '--url') {
     baseUrl = argv[++i] || '';
     if (!/^https?:\/\/[^/]/.test(baseUrl)) usage('--url needs an http(s) URL');
@@ -61,6 +73,7 @@ for (let i = 0; i < argv.length; i++) {
   else usage(`unexpected argument ${a}`);
 }
 if (!project) usage();
+if (order && readOnly) usage('--order places an order; --read-only writes nothing');
 
 const n = { pass: 0, fail: 0, skip: 0 };
 function line(status, check, detail = '') {
@@ -84,10 +97,10 @@ try {
 } catch (e) {
   usage(`.wp-create.json does not parse: ${e.message}`);
 }
-const store = manifest.store;
-if (!store || typeof store !== 'object' || !['catalog', 'store', 'full'].includes(store.tier)) {
-  usage('the manifest has no store block with a tier -- /wp-woo-setup records one');
-}
+const block = manifest.store && typeof manifest.store === 'object' && ['catalog', 'store', 'full'].includes(manifest.store.tier) ? manifest.store : null;
+if (block && tierFlag) usage(`--tier is for a store with no store block; this one records tier ${block.tier}`);
+if (!block && !tierFlag) usage('the manifest has no store block with a tier -- /wp-woo-setup records one, or pass --tier');
+const store = block || { tier: tierFlag };
 const wrapper = manifest.wp_cli && typeof manifest.wp_cli.wrapper === 'string' && manifest.wp_cli.wrapper.trim();
 if (!wrapper) usage('the manifest has no wp_cli.wrapper');
 const sells = store.tier !== 'catalog';
@@ -117,6 +130,7 @@ const local = facts.environment === 'local';
 
 if (order) {
   const refuse = [];
+  if (!block) refuse.push('the manifest has no store block, whose address the order is billed to');
   if (!local) refuse.push(`the site reads as ${facts.environment}, not local`);
   if (!sells) refuse.push('a catalog sells nothing');
   if (!facts.cod) refuse.push('cash on delivery is off (setup turns it on only on a local site)');
@@ -221,9 +235,11 @@ if (firstHop instanceof Error) {
 }
 
 // --- Setup has nothing to change ---------------------------------------------------------------
-const plan = evalFile(SETUP, project, 'dry-run');
+const plan = block ? evalFile(SETUP, project, 'dry-run') : { code: 0, out: '' };
 const planLines = plan.out.split('\n').filter(Boolean);
-if (plan.code !== 0) {
+if (!block) {
+  line('skip', 'setup', 'no store block: /wp-woo-setup has not set this store up');
+} else if (plan.code !== 0) {
   line('fail', 'setup', (planLines.find((l) => l.startsWith('refused:')) || plan.err.trim().split('\n').pop() || `exit ${plan.code}`).slice(0, 300));
 } else {
   const drift = planLines.filter((l) => l.startsWith('would-set '));
@@ -284,7 +300,9 @@ let cartOk = false;
 // Whether the site at the URL is the one WP-CLI reads: its cart session is in this database.
 // Only then can --order's clean-up reach the order it places.
 let sameSite = false;
-if (!sample) {
+if (readOnly) {
+  line('skip', 'cart', 'read-only: the Store API cart would open a session on the store');
+} else if (!sample) {
   line('fail', 'cart', 'no published simple product to put in a cart -- /wp-seed --products creates a demo\'s products');
 } else {
   const opened = await api('cart');

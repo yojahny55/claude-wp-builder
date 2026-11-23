@@ -17,7 +17,7 @@ node --check "$tool" || fail "$tool does not parse"
 php -l "$php" >/dev/null || fail "$php does not lint"
 
 # The command: gate, the call, the order's conditions, the report.
-need_token "$cmd" 'argument-hint: "[project-path] [--url <base-url>] [--order]"'
+need_token "$cmd" 'argument-hint: "[project-path] [--url <base-url>] [--order] [--read-only] [--tier catalog|store|full]"'
 need_token "$cmd" "bash -c 'node \"\$1/bin/wp-config.mjs\" validate \"\$2\"' _ \"\${CLAUDE_PLUGIN_ROOT}\" '\${PROJECT_PATH}'"
 need_token "$cmd" "bash -c 'node \"\$1/bin/woo-verify.mjs\" \"\$2\"' _ \"\${CLAUDE_PLUGIN_ROOT}\" '\${PROJECT_PATH}'"
 need_token "$cmd" 'No `store` block: stop'
@@ -37,7 +37,15 @@ need_token "$tool" "const r = helper('forget-session', key);"
 need_token "$tool" "sameSite = forget(token) > 0;"
 need_token "$tool" "} else if (!sameSite) {"
 need_token "$tool" "rejectUnauthorized: !local"
-need_token "$tool" "const plan = evalFile(SETUP, project, 'dry-run');"
+need_token "$tool" "const plan = block ? evalFile(SETUP, project, 'dry-run') : { code: 0, out: '' };"
+# --read-only writes nothing, not even the cart session; --tier is only for a store with no block,
+# and such a store gets no order (its address is the block's).
+need_token "$tool" "line('skip', 'cart', 'read-only: the Store API cart would open a session on the store');"
+need_token "$tool" "if (order && readOnly) usage("
+need_token "$tool" "if (block && tierFlag) usage("
+need_token "$tool" "if (!block) refuse.push("
+code=0; node "$tool" /nonexistent --order --read-only >/dev/null 2>&1 || code=$?
+[ "$code" = 64 ] || fail "$tool accepted --order with --read-only (exit $code, not 64)"
 # --order's refusal comes before the first request to the site.
 refuse_at=$(grep -n "process.stdout.write(\`refused: --order" "$tool" | sed -n 1p | cut -d: -f1)
 first_req=$(grep -n "await request(at('/'))" "$tool" | sed -n 1p | cut -d: -f1)

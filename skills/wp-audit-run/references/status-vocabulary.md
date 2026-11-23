@@ -36,7 +36,7 @@ and is never called `resolved`. Only a measured re-run turns `fixed_unverified` 
 ### Allowed UNMEASURED reasons
 
 An `UNMEASURED` check is accepted, and kept out of the "missing" list, only when its reason is
-one of these four (Step 6.8, point 2; `bin/audit-coverage.mjs` applies them):
+one of these five (Step 6.8, point 2; `bin/audit-coverage.mjs` applies them):
 
 | Reason | Example wording |
 |---|---|
@@ -44,6 +44,7 @@ one of these four (Step 6.8, point 2; `bin/audit-coverage.mjs` applies them):
 | needs the network or a third party | "third-party API unreachable", "rate limit" |
 | needs production | "needs the public URL", "production gate busy", "host blocked" |
 | needs a tier the run does not have | "needs Tier 3", "no WP-CLI", "no browser tool and no suite" |
+| needs a write a report-only run may not make | "report-only run: the cart check opens a Store API cart session, a write this run may not make" — it names the run and the write |
 
 Anything else is measurable with tools already present and counts as missing: "not measured in
 this run", "not run", "no browser measurement" when a browser is available, "clone", or no

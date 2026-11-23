@@ -44,6 +44,11 @@ field like everything else `/wp-seed` writes; options (size, colour) leave a dra
 because variations are not built. `/wp-woo-verify` checks the result from outside with
 `bin/woo-verify.mjs`, which calls `scripts/woo-verify.php` for the store's facts and, with
 `--order`, to cancel and delete its own test order on a local site; neither is run by hand.
+`/wp-audit`'s store category reads the same store through `bin/store-audit.mjs`, which runs
+`bin/woo-verify.mjs` (with `--read-only` on a report-only run) and `scripts/store-audit.php` for
+the checks that read the database: policy pages, email sender, shipping, tax, product data,
+failed scheduled actions, order-table sync and launch state. It writes nothing; it is not run
+by hand either.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the
