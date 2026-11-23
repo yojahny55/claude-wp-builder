@@ -123,6 +123,10 @@ with 'body.woocommerce-page .price { color: #888 ! IMPORTANT }'
 expect "IMPORTANT USED" "! important with a space and no semicolon"
 with '/* never !important here */'
 expect "STORE LAYER OK" "!important inside a comment"
+with 'body.woocommerce-page .onsale::before { content: "!important"; }'
+expect "STORE LAYER OK" "!important inside a string"
+with '@starting-style { .card { opacity: 0; } }'
+expect "UNSCOPED SELECTOR: .card" "an unscoped selector inside @starting-style"
 with 'body.woocommerce-page .price { color: #888;'
 expect "UNBALANCED BRACES" "an unclosed rule"
 
@@ -142,5 +146,7 @@ expect "MARKER MISSING" "the section's own line removed"
 
 node bin/store-layer-check.mjs "$tpl" >/dev/null 2>&1 && fail "one argument is not a usage error"
 [ "$(node bin/store-layer-check.mjs "$tpl" "$css" --bogus >/dev/null 2>&1; echo $?)" = 64 ] || fail "an unknown flag does not exit 64"
+[ "$(node bin/store-layer-check.mjs "$tmp/no-such.css" "$css" >/dev/null 2>&1; echo $?)" = 2 ] || fail "an unreadable template does not exit 2"
+[ "$(node bin/store-layer-check.mjs "$tpl" "$tmp/theme" >/dev/null 2>&1; echo $?)" = 2 ] || fail "a store.css that is a directory does not exit 2"
 
 echo "PASS: the store layer installs the base, writes only the demo section on WooCommerce's selectors, and is verified"

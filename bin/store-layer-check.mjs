@@ -12,8 +12,10 @@
  *
  * It parses the CSS rather than matching lines: comments and strings are skipped, a selector
  * list splits only at commas outside parentheses (`:not(.a, .b)` is one selector), selectors
- * inside @media, @supports, @container, @layer and @scope are checked, and the bodies of
- * @keyframes, @font-face and other at-rules that hold no selectors are not. A rule nested in
+ * inside @media, @supports, @container, @layer, @scope, @starting-style and any at-rule it does
+ * not know are checked, and the bodies of @keyframes, @font-face and the other at-rules that
+ * hold no selectors are not. A string's text is ignored, so `content: "!important"` is no
+ * finding. A rule nested in
  * a rule (CSS nesting) is scoped by its parent.
  *
  * --state prints `STORE LAYER EMPTY` (the section holds no rule: only the placeholder,
@@ -29,13 +31,17 @@
  *   UNSCOPED SELECTOR: <sel>      a selector does not start with body.woocommerce
  *   UNBALANCED BRACES             the section does not parse
  *
- * Exit: 0 ok (or --state), 1 a finding above, 64 usage.
+ * Exit: 0 ok (or --state), 1 a finding above, 2 a file could not be read, 64 usage (or a
+ * template with no marker).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import './lib/stdio-blocking.mjs';
 
 const MARKER = '====== Section: Store demo ======';
-const GROUP_AT = new Set(['media', 'supports', 'container', 'layer', 'scope', 'document']);
+// At-rules whose body holds descriptors or keyframe steps, not selectors. Every other at-rule
+// (@media, @supports, @container, @layer, @scope, @starting-style, one added later) is read as
+// a group, so its selectors are checked: an unknown at-rule errs toward a finding.
+const NO_SELECTOR_AT = /^(-[a-z]+-)?(keyframes|font-face|page|property|counter-style|font-feature-values|font-palette-values|view-transition)$/;
 
 const args = process.argv.slice(2);
 const stateOnly = args.includes('--state');
@@ -111,7 +117,7 @@ function analyse(css) {
     if (c === '"' || c === "'") {
       let j = i + 1;
       while (j < css.length && css[j] !== c) j += css[j] === '\\' ? 2 : 1;
-      prelude += css.slice(i, j + 1);
+      prelude += '""'; // a string's text can hold neither a brace nor a real !important
       i = j;
       continue;
     }
@@ -122,7 +128,7 @@ function analyse(css) {
       if (top === 'skip') { stack.push('skip'); continue; }
       if (top === 'rule') { stack.push('rule'); continue; } // nested rule: scoped by its parent
       const at = /^@([\w-]+)/.exec(p);
-      if (at) { stack.push(GROUP_AT.has(at[1].toLowerCase()) ? 'group' : 'skip'); continue; }
+      if (at) { stack.push(NO_SELECTOR_AT.test(at[1].toLowerCase()) ? 'skip' : 'group'); continue; }
       rules++;
       for (const s of selectors(p)) {
         if (!unscoped && !/^body\.woocommerce/.test(s)) unscoped = s.replace(/\s+/g, ' ');
@@ -144,13 +150,22 @@ function analyse(css) {
   return { rules, unscoped, important };
 }
 
+function read(path) {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (err) {
+    process.stderr.write(`cannot read ${path}: ${err.message}\n`);
+    process.exit(2);
+  }
+}
+
 if (!existsSync(cssPath)) finish('NO STORE CSS', 1);
-const tplParts = split(readFileSync(tplPath, 'utf8'));
+const tplParts = split(read(tplPath));
 if (!tplParts) {
   process.stderr.write(`the template ${tplPath} has no '${MARKER}' line\n`);
   process.exit(64);
 }
-const parts = split(readFileSync(cssPath, 'utf8'));
+const parts = split(read(cssPath));
 if (!parts) finish('MARKER MISSING', 1);
 const result = analyse(stripComments(parts[1]));
 

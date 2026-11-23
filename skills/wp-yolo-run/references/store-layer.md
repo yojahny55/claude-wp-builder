@@ -82,6 +82,7 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/store-layer-check.mjs" "${CLAUDE_PLUGIN_ROOT}/te
 | `NOTHING WRITTEN` | the agent found nothing to carry: list its report's skipped elements under Review |
 | `IMPORTANT USED`, `UNSCOPED SELECTOR: <selector>`, `UNBALANCED BRACES` | send the agent back once with the line; a second failure goes under Review, and the section stays for a person to fix |
 | `NO STORE CSS` | step 1 did not install; it is already under Review |
+| no line, exit `2` | a file could not be read (the reason is on stderr): list it under Review |
 
 ## 5. Review
 
