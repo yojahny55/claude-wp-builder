@@ -1,0 +1,203 @@
+/* Store pages: WooCommerce in the theme's own tokens.
+ * Copied by /wp-woo-setup to assets/css/store.css and loaded by inc/store-theme.php on store
+ * pages only (shop, product, product taxonomies, cart, checkout, my account), after
+ * WooCommerce's own stylesheets. Every other page never loads it.
+ *
+ * WooCommerce's stylesheet stays: this file only replaces its default palette (purple
+ * buttons, olive prices, lilac tabs) with the theme's, and puts back the borders Tailwind's
+ * preflight strips from form controls. Shop and product pages are WooCommerce's classic
+ * templates; cart and checkout are its blocks; my account is its classic shortcode.
+ *
+ * Every rule reads the --store-* properties below and nothing else, so a demo's store pages
+ * restyle the store by overriding them (and adding rules) in the delimited demo section at
+ * the end. Selectors start with body.woocommerce-page: WooCommerce's own selectors carry up
+ * to five classes, and the block stylesheets print after this file.
+ */
+
+/* ====== Section: Store tokens ====== */
+body.woocommerce-page {
+	--store-max-width: 1200px;
+	--store-gutter: 1.25rem;
+	--store-ink: var(--color-dark, #111827);
+	--store-canvas: var(--color-light, #ffffff);
+	--store-muted: var(--color-gray, #6b7280);
+	--store-accent: var(--color-primary, #111827);
+	--store-on-accent: var(--color-light, #ffffff);
+	--store-highlight: var(--color-accent, var(--store-accent));
+	--store-border: color-mix(in srgb, var(--store-ink) 22%, transparent);
+	--store-surface: color-mix(in srgb, var(--store-ink) 5%, var(--store-canvas));
+	--store-radius: 0.375rem;
+	--store-font: var(--font-primary, inherit);
+	--store-font-heading: var(--font-secondary, var(--store-font));
+	/* WooCommerce's classic form fields read these three. */
+	--wc-form-border-color: var(--store-border);
+	--wc-form-border-radius: var(--store-radius);
+	--wc-form-border-width: 1px;
+	--wc-form-color-background: var(--store-canvas);
+	--wc-form-color-text: var(--store-ink);
+}
+
+/* ====== Section: Store layout ====== */
+/* Shop and product pages open .store-page (inc/store-theme.php); cart, checkout and my account
+   are ordinary pages, whose article is a narrow reading column. */
+body.woocommerce-page .store-page,
+body.woocommerce-cart .site-main > article,
+body.woocommerce-checkout .site-main > article,
+body.woocommerce-account .site-main > article {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: var(--store-max-width);
+	margin-inline: auto;
+	padding: 3rem var(--store-gutter);
+	font-family: var(--store-font);
+	color: var(--store-ink);
+}
+
+body.woocommerce-cart .site-main > article .entry-content,
+body.woocommerce-checkout .site-main > article .entry-content,
+body.woocommerce-account .site-main > article .entry-content {
+	max-width: none;
+}
+
+body.woocommerce-page .woocommerce-products-header__title,
+body.woocommerce-page .product_title {
+	margin: 0 0 1rem;
+	font-family: var(--store-font-heading);
+	font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
+	line-height: 1.2;
+	color: var(--store-ink);
+}
+
+/* Tailwind's preflight leaves every heading at body size. Product titles in a loop stay as
+   WooCommerce sizes them. */
+body.woocommerce-page .store-page h2:not(.woocommerce-loop-product__title),
+body.woocommerce-account .site-main > article .woocommerce h2 {
+	margin: 2rem 0 1rem;
+	font-family: var(--store-font-heading);
+	font-size: 1.5rem;
+	line-height: 1.3;
+	color: var(--store-ink);
+}
+
+body.woocommerce-page .woocommerce-breadcrumb,
+body.woocommerce-page .woocommerce-result-count {
+	color: var(--store-muted);
+}
+
+/* ====== Section: Store form controls ====== */
+/* Tailwind's preflight sets every border to 0; WooCommerce's classic controls do not set one. */
+body.woocommerce-page select,
+body.woocommerce-page input.qty,
+body.woocommerce-page input.input-text,
+body.woocommerce-page textarea {
+	box-sizing: border-box;
+	min-height: 2.5rem;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--store-border);
+	border-radius: var(--store-radius);
+	background-color: var(--store-canvas);
+	color: var(--store-ink);
+	font: inherit;
+}
+
+/* ====== Section: Store buttons ====== */
+body.woocommerce-page a.button,
+body.woocommerce-page button.button,
+body.woocommerce-page input.button,
+body.woocommerce-page #respond input#submit,
+body.woocommerce-page a.button.alt,
+body.woocommerce-page button.button.alt,
+body.woocommerce-page input.button.alt,
+body.woocommerce-page .wc-block-components-button:not(.is-link) {
+	border: 0;
+	border-radius: var(--store-radius);
+	background-color: var(--store-accent);
+	color: var(--store-on-accent);
+	font-family: var(--store-font);
+	font-weight: 600;
+}
+
+body.woocommerce-page a.button:hover,
+body.woocommerce-page button.button:hover,
+body.woocommerce-page input.button:hover,
+body.woocommerce-page #respond input#submit:hover,
+body.woocommerce-page a.button.alt:hover,
+body.woocommerce-page button.button.alt:hover,
+body.woocommerce-page input.button.alt:hover,
+body.woocommerce-page .wc-block-components-button:not(.is-link):hover {
+	background-color: color-mix(in srgb, var(--store-accent) 85%, var(--store-ink));
+	color: var(--store-on-accent);
+}
+
+/* A variable product's button stays disabled until a variation is picked. */
+body.woocommerce-page a.button.alt.disabled,
+body.woocommerce-page a.button.alt.disabled:hover,
+body.woocommerce-page button.button.alt:disabled,
+body.woocommerce-page button.button.alt:disabled:hover,
+body.woocommerce-page button.button.alt.disabled,
+body.woocommerce-page button.button.alt.disabled:hover {
+	background-color: var(--store-accent);
+	color: var(--store-on-accent);
+	opacity: 0.5;
+}
+
+/* ====== Section: Store prices and badges ====== */
+body.woocommerce-page div.product p.price,
+body.woocommerce-page div.product span.price,
+body.woocommerce-page ul.products li.product .price,
+body.woocommerce-page div.product .stock.in-stock {
+	color: var(--store-ink);
+}
+
+body.woocommerce-page ul.products li.product .price del,
+body.woocommerce-page div.product p.price del {
+	color: var(--store-muted);
+}
+
+body.woocommerce-page span.onsale {
+	background-color: var(--store-highlight);
+	color: var(--store-on-accent);
+}
+
+/* ====== Section: Store tabs and pagination ====== */
+body.woocommerce-page div.product .woocommerce-tabs ul.tabs li {
+	border-color: var(--store-border);
+	background-color: var(--store-surface);
+	color: var(--store-ink);
+}
+
+body.woocommerce-page div.product .woocommerce-tabs ul.tabs li.active {
+	border-bottom-color: var(--store-canvas);
+	background-color: var(--store-canvas);
+	color: var(--store-ink);
+}
+
+body.woocommerce-page div.product .woocommerce-tabs ul.tabs li::before,
+body.woocommerce-page div.product .woocommerce-tabs ul.tabs li::after {
+	display: none;
+}
+
+body.woocommerce-page div.product .woocommerce-tabs ul.tabs li a {
+	color: var(--store-ink);
+}
+
+body.woocommerce-page nav.woocommerce-pagination ul li a:focus,
+body.woocommerce-page nav.woocommerce-pagination ul li a:hover,
+body.woocommerce-page nav.woocommerce-pagination ul li span.current {
+	background-color: var(--store-surface);
+	color: var(--store-ink);
+}
+
+/* ====== Section: Store notices ====== */
+/* Only the frame takes the theme's colours: green, blue and red still say success, info and
+   error. */
+body.woocommerce-page .woocommerce-message,
+body.woocommerce-page .woocommerce-info,
+body.woocommerce-page .woocommerce-error {
+	background-color: var(--store-surface);
+	color: var(--store-ink);
+}
+
+/* ====== Section: Store demo ====== */
+/* The demo's own store styling goes here (overrides of the --store-* properties first, then
+   rules), written from the demo's store pages. Empty until then. */

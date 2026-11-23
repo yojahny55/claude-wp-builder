@@ -1,7 +1,7 @@
 ---
 description: Record what a WooCommerce store sells and how, then bring the store in line with it — tier, address, currency, pages, shipping, tax, Stripe in test mode, bot protection
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[project-path] [--force]"
+argument-hint: "[project-path] [--force] [--store-theme]"
 ---
 
 # /wp-woo-setup — set up a WooCommerce store from a recorded decision
@@ -220,6 +220,78 @@ the form ID yourself**: an invented number is one the client ships by mistake. W
 `form` in the channels and Contact Form 7 active, create the enquiry form with the `wp-cf7`
 agent and report its ID as the value the client confirms. Report the channels whose field is
 still empty under "Content pending", like `/wp-finalize`.
+
+## Step 6.6: Store pages in the theme (tailwind themes)
+
+Without `add_theme_support( 'woocommerce' )` WooCommerce squeezes the shop and every product
+into `page.php`, with no gallery zoom, lightbox or slider, in its own purple and olive. This
+step installs two fixed files: `${CLAUDE_PLUGIN_ROOT}/templates/store/store-theme.php` to
+`<theme>/inc/store-theme.php`, which declares support, replaces WooCommerce's wrapper and
+sidebar (the theme's header already opens `<main id="primary">`) and loads the stylesheet on
+store pages only; and `${CLAUDE_PLUGIN_ROOT}/templates/store/store.css` to
+`<theme>/assets/css/store.css`, WooCommerce in the theme's tokens. **Copy them; do not retype
+or "improve" them.** Every other page of the site renders as before.
+
+Skip this step, saying the store pages need the theme's own work, unless `.claude/CLAUDE.md`
+records `**Template:** tailwind` — no `.claude/CLAUDE.md`, a theme `/wp-adopt` registered, or a
+cinematic theme (no `#primary` wrapper) all skip.
+
+It changes how an existing store looks, so it **installs only on a new store** — Step 3 found
+no `store` block and wrote it in this run — **or with `--store-theme`**. On a store that already
+had its block and has no `inc/store-theme.php`, install nothing and report one line: "store
+pages: theme support not installed; `/wp-woo-setup --store-theme` installs it and changes how
+the shop, product, cart, checkout and account pages look".
+
+Same tokens as Step 6.5 (`__prefix__`, `__textdomain__`). The stylesheet is compared without
+its last section, `Section: Store demo`, which holds the demo's own store styling and is the
+project's (the theme's copy keeps its own):
+
+```bash
+theme="<theme>"; tmp=$(mktemp -d)
+sed -e "s/__prefix__/<prefix>/g" -e "s/__textdomain__/<slug>/g" \
+  "${CLAUDE_PLUGIN_ROOT}/templates/store/store-theme.php" > "$tmp/store-theme.php"
+head_of() { sed '/====== Section: Store demo ======/,$d' "$1"; }
+st="INSTALLED"
+if grep -q '__prefix__\|__textdomain__' "$tmp/store-theme.php"; then st="UNSUBSTITUTED TOKENS"
+elif ! php -l "$tmp/store-theme.php" >/dev/null; then st="PHP LINT FAILED"; fi
+for pair in "store-theme.php:inc/store-theme.php" "store.css:assets/css/store.css"; do
+  [ "$st" = INSTALLED ] || break
+  src="$tmp/${pair%%:*}"; [ -f "$src" ] || src="${CLAUDE_PLUGIN_ROOT}/templates/store/${pair%%:*}"
+  dest="$theme/${pair#*:}"
+  if [ ! -f "$dest" ]; then
+    mkdir -p "$(dirname "$dest")" && /bin/cp -f "$src" "$dest" && cmp -s "$src" "$dest" \
+      && echo "INSTALLED $dest" || { echo "FAILED $dest"; st=FAILED; }
+  elif [ "${pair%%:*}" = store.css ] && cmp -s <(head_of "$src") <(head_of "$dest"); then echo "UNCHANGED $dest"
+  elif cmp -s "$src" "$dest"; then echo "UNCHANGED $dest"
+  else diff -u "$dest" "$src"; echo "EDITED $dest"; fi
+done
+[ "$st" = INSTALLED ] || echo "$st"
+rm -rf "$tmp"
+```
+
+`INSTALLED` or `UNCHANGED` lines: go on. A last line `UNSUBSTITUTED TOKENS`, `PHP LINT FAILED`
+or `FAILED`: stop and report it. `EDITED`: the theme's copy was changed; stop and show the
+diff, unless `--force`, which copies that one file over — for `store.css` keep the theme's
+`Section: Store demo` and replace only what comes before it. Then require the PHP from the
+theme's `functions.php`, beside the other `inc/` requires (never load it twice):
+
+```php
+require_once __DIR__ . '/inc/store-theme.php';
+```
+
+The stylesheet reads the theme's Tailwind tokens (`--color-primary`, `--color-dark`,
+`--color-light`, `--color-gray`, `--color-accent`, `--font-primary`, `--font-secondary`).
+Tailwind emits only the variables something uses; `inc/store-theme.php` names them, and it is
+in the build's `@source`, so rebuild once it is installed:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>
+```
+
+Then check the compiled `assets/css/dist/main.css` for each name and report the missing ones:
+the theme's `@theme` does not declare them (a craft palette renames its tokens), so the store
+falls back to neutral greys there until the `Section: Store demo` of `store.css` maps the
+`--store-*` properties to the theme's own names.
 
 ## Step 7: Report
 
