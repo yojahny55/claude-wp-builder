@@ -163,7 +163,8 @@ src="$theme/assets/css/src/tailwindcss"
 rm -rf "$start/undone-tailwindcss"
 mv "$src" "$start/undone-tailwindcss" && cp -a "$start/before/tailwindcss" "$src" \
   || { echo "Tailwind tree not swapped back: round NOT undone"; exit 1; }
-cp -a "$start/before/$part" "$theme/$part"
+cp -a "$start/before/$part" "$theme/$part" \
+  || { echo "template part not restored: round NOT undone"; exit 1; }
 ```
 
 A `round NOT undone` is reported as such, never as "reverted".

@@ -58,6 +58,7 @@ need_token "$check" 'cp -a "$start/before/$part" "$theme/$part"'
 need_token "$check" '[ -d "$start/before/tailwindcss" ] && [ -f "$start/before/$part" ] && [ -d "$src" ] \'
 need_token "$check" '|| { echo "no copy in $start/before, or no $src: round NOT undone"; exit 1; }'
 need_token "$check" '|| { echo "Tailwind tree not swapped back: round NOT undone"; exit 1; }'
+need_token "$check" '|| { echo "template part not restored: round NOT undone"; exit 1; }'
 need_token "$check" 'cp -a "$src" "$start/before/tailwindcss"'
 # The undo paragraph swaps the whole tree back, so no rule or new file a round added survives.
 awk '/^\*\*A round that made it worse is undone\.\*\*/{on=1} on&&/^Then stop/{exit} on' "$check" \
