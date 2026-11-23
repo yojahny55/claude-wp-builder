@@ -21,6 +21,7 @@ read it whole and follow it in order.
 | legal | [references/legal.md](references/legal.md) | `page-legal.php`, `inc/legal-search.php` (legal pages out of site search), `fields/legal.php`, the CSS dispatch, then the Privacy, Terms and Cookie Policy drafts |
 | 404 | [references/404.md](references/404.md) | The styled `404.php` and its CSS dispatch |
 | search | [references/search.md](references/search.md) | The styled `search.php` with its no-results state and its CSS dispatch |
+| `tailwind` theme, any type | [references/tailwind-prompt.md](references/tailwind-prompt.md) | The file ownership between `wp-template` and `wp-tailwind`, and the quoted author-mode prompt every dispatch site hands `wp-tailwind` |
 | embed | [references/embed.md](references/embed.md) | The provider-embed template and its marked insertion point, optional chrome fields, the CSS dispatch, the `Requires plugin` summary line |
 
 ## Scripts

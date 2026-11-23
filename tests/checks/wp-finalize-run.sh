@@ -50,10 +50,12 @@ done
 awk '/^$/ { n = 0; next } /skills\/wp-finalize-run\/references\// { if (++n > 1) bad = 1 }
   END { exit bad }' "$cmd" || err "$cmd names two wp-finalize-run references in one paragraph"
 
-# The command stays a map. Steps 1, 2 and 4 and the short checks (1, 3, 5, 6, the Tailwind
-# convention, the craft gate) stay whole: the report format and the short gates are what the
-# run needs in view from the start. 12288 is the new size (about 11.6 KB) plus headroom for a
-# few added lines; past it, move the next long check to a reference instead of raising it.
+# The command stays a map. Steps 1, 2 and 4 and the short checks (1, 3, 5, 6, the craft gate)
+# stay whole: the report format and the short gates are what the run needs in view from the
+# start. The Tailwind convention keeps its heading and skip condition; its script call and
+# failure list, read only on a tailwind theme, live in a reference. 12288 is the size the
+# command grew back to (11.6 KB, now 10.4 KB) plus headroom for a few added lines; past it,
+# move the next long check to a reference instead of raising it.
 size=$(wc -c < "$cmd")
 [ "$size" -le 12288 ] || err "$cmd is $size bytes; move long step detail to $refs"
 
