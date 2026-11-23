@@ -24,6 +24,7 @@ read it whole and follow it in order.
 | 5, every section | [references/dispatch-rules.md](references/dispatch-rules.md) | The field naming convention, the GEO citability rubric, the `--transcribe` overlay, CSS agent routing by `Template:`, the one-writer-per-file ownership rule |
 | 5, not a contact section | [references/non-contact.md](references/non-contact.md) | Agents 1-3 (`wp-acf`, `wp-template`, `wp-css` or `wp-tailwind` in author mode), their order per template, the tabs/accordion/filter markup contract |
 | 5, contact section | [references/contact.md](references/contact.md) | The two-phase dispatch with `wp-cf7`, and where `wp-css` or `wp-tailwind` and `wp-template` sit in each phase |
+| 6.6, `--visual` set | [references/visual-check.md](references/visual-check.md) | The page that shows the section, the `bin/section-diff.mjs` call and its exits, the CSS fix pass with the diff images, and when the three-round loop stops |
 | 6.7, blog section | [references/blog-templates.md](references/blog-templates.md) | When a `blog`, `journal`, `news` or `posts` section runs `/wp-page blog`, the three cases that skip it, and what the summary says |
 | 7, contact section | [references/summary-contact.md](references/summary-contact.md) | The contact summary: the CF7 form and email files, and the IDs of the forms created |
 
