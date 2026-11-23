@@ -22,6 +22,7 @@ import { existsSync, readFileSync, renameSync, statSync, unlinkSync } from 'node
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import './lib/stdio-blocking.mjs';
 import { findBrowser } from './lib/browsers.mjs';
 
 const WIDTH = 1200;
