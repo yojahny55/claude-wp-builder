@@ -19,7 +19,7 @@ const [shotdir, baselinedir, diffdir, toleranceArg, requiredArg = ''] = process.
 // Mutants that must have been rendered (comma-separated), so dropping one is a failure.
 const required = requiredArg.split(',').filter(Boolean);
 if (!shotdir || !baselinedir || !diffdir || !toleranceArg) {
-  console.log('usage: node compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance>');
+  console.log('usage: node compare.mjs <shotdir> <baselinedir> <diffdir> <tolerance> [<mutant,...>]');
   process.exit(1);
 }
 const tolerance = parseFloat(toleranceArg);
