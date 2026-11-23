@@ -100,6 +100,8 @@ Siblings double the storage of every image. When PNG originals are most of the u
 replacing each PNG attachment with a WebP original saves far more. Read
 `references/png-to-webp-conversion.md` before converting: the reference map of old to new
 files, the database replacement and the traps of an interrupted run.
+[scripts/webp-migrate.php](scripts/webp-migrate.php) runs that procedure (`plan`, `convert`,
+`replace`, `verify`, `move-aside`); `/wp-webp migrate` drives it, never by hand.
 
 ## Robin's runtime files and git
 

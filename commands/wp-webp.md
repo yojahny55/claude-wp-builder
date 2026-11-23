@@ -1,7 +1,7 @@
 ---
-description: Convert new PNG and JPEG uploads to WebP before WordPress makes their sizes — a must-use plugin with a PSNR quality floor
+description: WebP for a WordPress library — new PNG and JPEG uploads converted by a must-use plugin with a PSNR floor, and an existing PNG library migrated in place
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion
-argument-hint: "upload on | upload off | upload status [--force]"
+argument-hint: "upload on | upload off | upload status [--force] | migrate"
 ---
 
 # /wp-webp — every new upload born WebP
@@ -45,8 +45,8 @@ bash -c 'node "$1/bin/wp-config.mjs" get "$2" wp_cli.wrapper' _ "${CLAUDE_PLUGIN
 
 ## Step 2: Arguments
 
-`$ARGUMENTS` is `upload` followed by `on`, `off` or `status`. Anything else: print the usage line
-and stop. `--force` lets `on` replace, and `off` remove, a copy that no longer matches the
+`$ARGUMENTS` is `upload` followed by `on`, `off` or `status`, or `migrate` alone. Anything else:
+print the usage line and stop. `migrate` skips Steps 3 to 6 and runs the section at the end. `--force` lets `on` replace, and `off` remove, a copy that no longer matches the
 template.
 
 ## Step 3: Where the plugin goes
@@ -136,3 +136,96 @@ Report the action, the plugin's status line and, on a site with Robin active, th
 serving the images uploaded before this. On a site whose uploads live in S3 (`/wp-s3`), the
 plugin converts through a local temporary copy; nothing else is needed. The file lives in
 `wp-content/mu-plugins/`, which a deploy has to carry like any plugin.
+
+## `migrate`: convert the PNG library already on disk
+
+`upload on` only changes what comes next. `migrate` converts what is already there: every PNG
+attachment becomes a WebP attachment in place, every stored reference follows it, and the old
+files move to a folder outside uploads only after nothing points at them. It runs
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/scripts/webp-migrate.php`, the written procedure in
+`${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/references/png-to-webp-conversion.md` as a script.
+**Read that reference before the first run**; this section is the order, the reference is
+the why, and its *Traps* section is the repair manual. JPEGs are not converted: the measured
+saving was on PNG originals, and a JPEG is already lossy.
+
+Do not run it to save a few large PNGs (resize those), or on a site whose uploads live in S3
+(the script refuses a stream-wrapper uploads directory: convert a local copy). On a live site
+that takes writes, follow the reference's *Production order*; rehearse on a clone first.
+
+Throughout, `$S` is the script, run with the wrapper; `<work>` is a folder **outside** the
+WordPress root (the script refuses one inside it), one per site, for example
+`~/.wp-webp-migrate/<site-slug>`. It holds `map.tsv`, the old-to-new file map every later
+step reads: keep it until the site is verified in production.
+
+```bash
+S="${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/scripts/webp-migrate.php"
+$WP eval-file "$S" plan <work>
+```
+
+`plan` prints the PNG attachment count, their bytes, whether the image editor can write WebP
+(`webp_editor`), whether a run stopped halfway (`in_progress`) and how many files the map
+already holds. No PNG attachments: report it and stop. `webp_editor: false`: stop, the server
+cannot do it. `in_progress: true`: stop and follow *Traps* before anything else.
+
+**M1. Back up the database and the uploads.** No migration runs without both:
+
+```bash
+B=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-backup.sh" '<wp-root>' --wrapper "$WP" --uploads --label pre-webp) || exit 1
+```
+
+Exit `1` or `2` means there is no backup: stop. Report `$B`.
+
+**M2. Convert.** Ask the operator to confirm with the `plan` numbers, then dry-run, then run.
+`limit=N` converts in batches; a later run resumes, because only `image/png` attachments are
+selected:
+
+```bash
+$WP eval-file "$S" convert <work> dry-run
+$WP eval-file "$S" convert <work>
+```
+
+Old files stay on disk and nothing that references them changes yet, so the site still
+renders. Exit `1` lists the attachments it skipped and why; the rest converted.
+
+**M3. Replace references.** On a live site turn `/wp-maintenance on` first, so no write lands
+between the read and the replace. Dry-run, show the per-column counts, then run:
+
+```bash
+$WP eval-file "$S" replace <work> dry-run
+$WP eval-file "$S" replace <work>
+```
+
+Then flush what caches the old names: `$WP elementor flush-css` when Elementor is active,
+`$WP cache flush`, and any page cache or CDN the site has.
+
+**M4. Verify, in the database and in the served HTML.**
+
+```bash
+$WP eval-file "$S" verify <work>
+URL=$($WP option get home)
+curl -sk "$URL/" | grep -oE 'wp-content/uploads/[^"'"'"' )]+\.png' | sort -u
+```
+
+`verify` must exit `0`: every new file exists and no row names an old one. The `curl` must print
+nothing for the home page and for each template the site uses (a page, a post, an archive,
+the shop on a store). A `.png` still served is a cache or a file outside the map: find it
+before going on. `/wp-maintenance off` once it is clean.
+
+**M5. Redirect old URLs.** Print the Apache or nginx rule from the reference's step 6 for the
+server the manifest records, and tell the operator where it goes. Never write server config
+yourself; production's config is not the clone's.
+
+**M6. Move the old files aside.** Only after M4 is clean. The folder must be outside uploads
+and the WordPress root; beside the backup is the natural place:
+
+```bash
+$WP eval-file "$S" move-aside <work> backup="$B/old-png" dry-run
+$WP eval-file "$S" move-aside <work> backup="$B/old-png"
+```
+
+It re-runs `verify` first and refuses if it fails. Nothing is deleted: removing the old files
+is the operator's decision, after production is verified.
+
+Report: attachments converted and skipped, rows replaced per column, files moved and their
+bytes, the uploads size before and after (`du -sh`), `$B`, `<work>`, and the redirect rule
+still to apply.
