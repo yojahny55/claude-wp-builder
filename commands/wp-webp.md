@@ -123,7 +123,7 @@ the upload would stay a JPEG by design, and that is not a failure.
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 php -r '$i=imagecreatetruecolor(64,64); imagefilledrectangle($i,0,0,63,63,imagecolorallocate($i,30,120,200)); imagejpeg($i,$argv[1],95);' "$T/webp-on-upload-probe.jpg"
 AUTHOR=$($WP user list --role=administrator --field=ID --number=1)
-id=$($WP media import "$T/webp-on-upload-probe.jpg" --post_author="$AUTHOR" --porcelain)
+id=$($WP media import "$T/webp-on-upload-probe.jpg" --user="$AUTHOR" --porcelain)
 $WP post get "$id" --field=post_mime_type
 $WP post delete "$id" --force
 ```
