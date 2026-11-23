@@ -98,7 +98,7 @@ wrote one:
      `min_amount`, `local_pickup`.
    - **Tax** — whether tax is on, whether prices include it, and the merchant's rates (`country`,
      optional `state`, `rate` like `"6.0000"`, `name`, `shipping` true or false).
-   - Payments are always `{"gateway": "stripe", "mode": "test"}`. Going live is a launch step.
+   - Payments are always `{"gateway": "stripe", "mode": "test"}`. Going live is `/wp-woo-launch`.
 
 Write the answers into `.wp-create.json` under `store`, in exactly this shape:
 
@@ -178,7 +178,8 @@ Append ` force` only when the operator passed `--force`. It takes back values th
 changed and applies to a store that already has orders, which otherwise runs report-only. The
 one exception: on a store that has orders, launch state — coming soon, Stripe's
 `enabled`/`testmode`, cash on delivery — is never changed by `force`; change it in WooCommerce
-instead.
+instead. The same on a store `/wp-woo-launch` launched (`store.launch` in the manifest): its
+launch state is the launch's.
 
 ## Step 6.5: Enquiry channels in the theme (catalog with `whatsapp` or `form` only)
 
@@ -318,10 +319,11 @@ falls back to neutral greys there until the `Section: Store demo` of `store.css`
 |---|---|
 | `set` / `would-set` | changed, or would be in a dry or report-only run |
 | `ok` | already what the block says |
-| `client` | differs, and setup did not write it: left alone; `force` takes it back — except launch state on a store with orders, which `force` never changes; change it in WooCommerce |
+| `client` | differs, and setup did not write it: left alone; `force` takes it back — except launch state on a store with orders or a launched one, which `force` never changes; change it in WooCommerce, or with `/wp-woo-launch` |
 | `degraded` | could not be done here; the line says why and what to do |
 | `note` | information only |
 
 Next: build the theme and the store pages, then seed products. Every later store command reads
 the `store` block instead of asking again. Once there are products, `/wp-woo-verify` checks it from outside, and
-`/wp-woo-verify --order` places a test order on a local store and deletes it.
+`/wp-woo-verify --order` places a test order on a local store and deletes it. On production,
+`/wp-woo-launch` takes the store live.

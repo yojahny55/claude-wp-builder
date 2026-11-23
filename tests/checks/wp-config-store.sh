@@ -37,6 +37,12 @@ refused('shortcode without a reason', (s) => { s.checkout = 'shortcode'; }, 'che
 refused('live mode', (s) => { s.payments.mode = 'live'; }, 'store.payments.mode');
 refused('a secret in the manifest', (s) => { s.payments.test_secret_key = 'sk_test_x'; }, '.wp-create.local.json');
 refused('unknown key', (s) => { s.colour = 'red'; }, 'store.colour');
+must(validateStore({ ...good, launch: { at: '2026-11-23T18:00:00Z', backup: '/backups/site-pre-launch' } }).length === 0, 'a launch record written by /wp-woo-launch is refused');
+must(validateStore({ ...good, launch: { at: '2026-11-23T18:00:00Z', backup: '/b', reverted_at: '2026-11-24T09:00:00Z' } }).length === 0, 'a reverted launch record is refused');
+refused('launch with no timestamp', (s) => { s.launch = { backup: '/b' }; }, 'store.launch.at');
+refused('launch with a relative backup', (s) => { s.launch = { at: '2026-11-23T18:00:00Z', backup: 'backups/x' }; }, 'store.launch.backup');
+refused('launch with an unknown key', (s) => { s.launch = { at: '2026-11-23T18:00:00Z', backup: '/b', live: true }; }, 'store.launch.live');
+refused('launch does not make live mode valid', (s) => { s.launch = { at: '2026-11-23T18:00:00Z', backup: '/b' }; s.payments.mode = 'live'; }, 'store.payments.mode');
 refused('duplicate zone', (s) => { s.shipping.push(structuredClone(s.shipping[0])); }, 'used twice');
 refused('duplicate method', (s) => { s.shipping[0].methods.push({ type: 'flat_rate', cost: '5.00' }); }, 'appears twice');
 refused('numeric cost', (s) => { s.shipping[0].methods[0].cost = 10; }, 'cost');

@@ -505,6 +505,14 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   session, so a report-only run leaves STORE-004 `UNMEASURED`. On a store with no `store` block
   the tier is inferred (catalog when `store-kit`'s catalog mode is on, a selling store
   otherwise), and cash on delivery is never a launch item there: it may be the merchant's.
+- **A launch is never proven with a real payment.** `/wp-woo-launch` checks that the live
+  Stripe keys have live prefixes and that Turnstile reads keys that are not Cloudflare's test
+  ones, and its fixture check launches with fakes of that shape; no check reaches Stripe or
+  Cloudflare, because a live key cannot sit in CI and a live charge costs money. Whether the
+  keys belong to the merchant's account, and the webhook endpoint is registered, shows on the
+  first real order, which the merchant places. A launch also needs `WP_ENVIRONMENT_TYPE` to say
+  `production`: a production site that leaves it unset reads as production too, and one that
+  sets it to `staging` is never launched here.
 - **No subscriptions and no bookings.** The free subscriptions plugin is rejected
   (`skills/wp-woocommerce/references/plugins.md`), and WooCommerce's own Subscriptions and
   Bookings are paid extensions this repository has no licence to install or test, so neither

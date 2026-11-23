@@ -21,8 +21,8 @@
  * PHP 7.4 floor.
  */
 
-/** Cloudflare's documented Turnstile test site keys: always pass, always block, or challenge. */
-const STOREAUDIT_TURNSTILE_TEST_KEY = '/^[123]x0{20}A[AB]$/';
+/** Cloudflare's documented Turnstile test site keys: always pass, always block, or challenge (AA, AB, BA, BB, FF). */
+const STOREAUDIT_TURNSTILE_TEST_KEY = '/^[123]x0{20}[A-F]{2}$/';
 
 /** How many ids a finding lists before it says "and N more". */
 const STOREAUDIT_LIST = 10;

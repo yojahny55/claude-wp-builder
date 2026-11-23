@@ -60,7 +60,7 @@ SH
   chmod +x "$tmp/stub/$b"
 done
 printf '#!/usr/bin/env bash\nprintf "ARG:%%s\\n" "$@" >>"$ARGV_OUT"\n' >"$tmp/plugin/bin/store-kit-sync.sh"
-for t in demo-sections woo-verify; do
+for t in demo-sections woo-verify woo-launch; do
   cat >"$tmp/plugin/bin/$t.mjs" <<'JS'
 import { appendFileSync } from 'node:fs';
 appendFileSync(process.env.ARGV_OUT, process.argv.slice(2).map((a) => `ARG:${a}\n`).join(''));
@@ -88,6 +88,8 @@ while IFS= read -r line; do
     *setfacl*) grep -Fxq "ARG:g:$webuser:rwX" "$tmp/argv" && grep -Fxq "ARG:$hostile/wp-content" "$tmp/argv" \
          || fail "setfacl args not intact: $line" ;;
     *demo-sections*|*woo-verify*) [ "$(cat "$tmp/argv")" = "ARG:$hostile" ] || fail "node tool path not intact: $line ($(cat "$tmp/argv"))" ;;
+    *woo-launch*) [ "$(sed -n 1p "$tmp/argv")" = "ARG:$hostile" ] || fail "node tool path not intact: $line ($(cat "$tmp/argv"))"
+         case $line in *--confirm*) [ "$(sed -n 3p "$tmp/argv")" = "ARG:<typed host>" ] || fail "--confirm host not intact: $line" ;; esac ;;
     *store-kit-sync*) grep -Fxq "ARG:$hostile/wp-content/plugins" "$tmp/argv" || fail "store-kit-sync path not intact: $line"
          case $line in *'$WP '*) grep -Fxq 'ARG:--allow-root' "$tmp/argv" || fail "\$WP flags were lost after store-kit-sync: $line" ;; esac ;;
     *'$WP '*) grep -Fxq 'ARG:--allow-root' "$tmp/argv" || fail "\$WP flags were lost: $line"

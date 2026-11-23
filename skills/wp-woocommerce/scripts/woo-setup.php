@@ -6,13 +6,14 @@
  *   The flags are bare words: `wp eval-file` refuses a --flag it does not know.
  *   dry-run  print what would change, write nothing
  *   force    also take back values this script did not write (a client's edit, an adopted store),
- *            except launch state on a store with orders, which force never changes
+ *            except launch state on a store with orders or a launched one (store.launch),
+ *            which force never changes
  *
  * Every line is `<status> <setting>[: detail]`:
  *   set / would-set  changed (or would be, in a dry or report-only run)
  *   ok               already what the block says
  *   client           differs, and this script did not write it: left alone (force takes it back,
- *                    except launch state on a store with orders)
+ *                    except launch state on a store with orders or a launched one)
  *   degraded         could not be done here, or a row setup created that the block no longer
  *                    names (setup never deletes); the line says why and what to do
  *   note             information, counted nowhere
@@ -55,9 +56,10 @@ function wooset_converge( $id, $desired, $get, $set, $note = '', $kind = '' ) {
 	$c        = &$GLOBALS['wooset_ctx'];
 	$current  = call_user_func( $get );
 	$recorded = isset( $c['state'][ $id ] ) ? $c['state'][ $id ] : null;
-	$held     = 'launch' === $kind && $c['orders'];
-	// On a store with orders launch state is never written, absent or not, forced or not:
-	// WooCommerce reads an absent coming-soon row as a live shop, so writing one takes it offline.
+	$held     = 'launch' === $kind && ( $c['orders'] || $c['launched'] );
+	// On a store with orders, or one /wp-woo-launch launched (store.launch in the manifest), launch
+	// state is never written, absent or not, forced or not: WooCommerce reads an absent
+	// coming-soon row as a live shop, so writing one takes it offline.
 	$decision = $held
 		? ( wooset_same( $current, $desired ) ? 'ok' : 'client' )
 		: wooset_decide( $current, $desired, $recorded, $c['fresh'], $c['force'] );
@@ -77,7 +79,7 @@ function wooset_converge( $id, $desired, $get, $set, $note = '', $kind = '' ) {
 	if ( 'client' === $decision ) {
 		$show = 'secret' === $kind ? 'wooset_fingerprint' : 'wooset_show';
 		$note = 'kept ' . ( $held && null === $current ? 'absent' : $show( $current ) ) . ', the block says ' . $show( $desired )
-			. ( $held ? ' (launch state on a store with orders: change it in WooCommerce, force does not)' : ' (force takes it back)' );
+			. ( $held ? ( $c['launched'] ? ' (launch state on a launched store: /wp-woo-launch owns it, force does not change it)' : ' (launch state on a store with orders: change it in WooCommerce, force does not)' ) : ' (force takes it back)' );
 	}
 	wooset_report( $decision, $id, $note );
 	return $decision;
@@ -836,13 +838,15 @@ $wooset_fresh  = wooset_is_fresh( $wooset_orders, isset( $wooset_manifest['origi
 $wooset_report_only = ! $wooset_fresh && ! $wooset_state && ! $wooset_force;
 
 $GLOBALS['wooset_ctx'] = array(
-	'write'  => ! $wooset_dry && ! $wooset_report_only,
-	'fresh'  => $wooset_fresh,
-	'orders' => $wooset_orders,
-	'force'  => $wooset_force,
-	'local'  => 'local' === wp_get_environment_type(),
-	'state'  => $wooset_state,
-	'n'      => array( 'set' => 0, 'ok' => 0, 'client' => 0, 'degraded' => 0 ),
+	'write'    => ! $wooset_dry && ! $wooset_report_only,
+	'fresh'    => $wooset_fresh,
+	'orders'   => $wooset_orders,
+	// /wp-woo-launch records store.launch; from then on it alone writes launch state.
+	'launched' => isset( $wooset_store['launch'] ) && is_array( $wooset_store['launch'] ),
+	'force'    => $wooset_force,
+	'local'    => 'local' === wp_get_environment_type(),
+	'state'    => $wooset_state,
+	'n'        => array( 'set' => 0, 'ok' => 0, 'client' => 0, 'degraded' => 0 ),
 );
 if ( $wooset_report_only && ! $wooset_dry ) {
 	WP_CLI::line( 'report-only: this store has orders or was adopted, and setup has never run here -- re-run with force to apply; force never changes launch state (coming soon, Stripe enabled and test mode, cash on delivery) on a store with orders' );

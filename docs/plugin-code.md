@@ -56,6 +56,11 @@ load-bearing gates rather than helpers:
 - `woo-verify.mjs` — `/wp-woo-verify`: a store checked from outside (setup's dry run, the store
   pages, the shop, a Store API cart, and with `--order` a local test order it deletes), with
   `skills/wp-woocommerce/scripts/woo-verify.php` on the WordPress side.
+- `woo-launch.mjs` — `/wp-woo-launch`: a store taken live on production (live keys and the store
+  audit checked first, a pre-launch backup, Stripe, cash on delivery and Turnstile switched in
+  order with coming soon off last, a verify of the live store that puts coming soon back when it
+  fails, and `store.launch` recorded), with `skills/wp-woocommerce/scripts/woo-launch.php` on the
+  WordPress side.
 - `decision-sheet.mjs` — the approval page for `design_impact` findings and the parser for its
   answers.
 - `audit-report.mjs` — renders an audit run into a dated Markdown and HTML deliverable.
