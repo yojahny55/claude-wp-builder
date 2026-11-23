@@ -459,8 +459,14 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   `role: store` page, so a nav item or button pointing at `shop.html` has no page to resolve to.
   It lists each such link under Review instead of adding a menu item: a correct one depends on
   the menu per language, its position in the demo nav and an idempotent re-seed, which belong
-  with the styling of the store pages (N01 piece 3, second half). Under Polylang every
-  language's link goes to WooCommerce's single page until the Polylang bridge.
+  in `/wp-seed`'s menu step, still to come. Under Polylang every language's link goes to
+  WooCommerce's single page until the Polylang bridge.
+- **The demo's store styling reaches only what the selector reference names.** `/wp-yolo`'s
+  store layer translates a demo's store pages onto WooCommerce's own markup through
+  `skills/wp-woocommerce/references/store-selectors.md`; an element with no row there is
+  skipped and listed under Review, because WooCommerce renders no demo markup to put it on. It
+  runs on tailwind themes only (the base `store.css` is theirs), and no check compares the
+  store pages with the demo.
 - **Setup ownership is by value hash.** A client edit that happens to restore setup's own value
   reads as setup's, and the hash records a value, not a history.
 - **Setup reports what the block stopped naming, and never deletes it.** A zone, shipping method

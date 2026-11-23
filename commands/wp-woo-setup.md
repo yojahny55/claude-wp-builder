@@ -41,6 +41,13 @@ Read the WP-CLI wrapper once and use it as `$WP` below:
 bash -c 'node "$1/bin/wp-config.mjs" get "$2" wp_cli.wrapper' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
+**`--store-theme` on a recorded store goes straight to Step 6.6.** When `.wp-create.json`
+already has a `store` block and `--store-theme` was passed, the store is set up and the flag
+asks only for the theme files: skip Steps 2 to 6.5, run Step 6.6, then report. Without a
+`store` block the flag changes nothing here: the run sets up a new store, and Step 6.6 installs
+on a new store anyway. `/wp-yolo` runs it this way once the theme exists, because the
+`/wp-woo-setup` that `/wp-create` runs comes before any theme.
+
 ## Step 2: WooCommerce and store-kit
 
 A store needs native WP-CLI, running on the host. store-kit is copied into the host's
