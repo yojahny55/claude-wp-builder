@@ -161,8 +161,8 @@ Making the command flow smoother and more guided.
 - [x] **Broken-site corpus with expected audit findings** `DELIVERED`
   A fixture site seeded with known defects and a file of the findings an audit should report, so a test can fail because an audit *missed* a defect. [seeded-defects](tests/fixtures/seeded-defects/) ships a theme and plugin with 11 marked defects and `expected-findings.json`; [provision.sh](tests/fixtures/wp/provision.sh) installs them with `WP_FIXTURE_SEEDED=1`, without their `SEEDED` markers, on a core verified against its checksums. [The check](tests/checks/seeded-defects.sh) validates the corpus offline, compares a committed `recorded-findings.json` in CI (with negative cases), and compares a real run through `SEEDED_FINDINGS`, counting a code folded under `also_affects` as fired. A live report-only `/wp-audit` over the five code domains reported 11 of 11. What that run exposed in the agent report contract is fixed in [audit-schema.mjs](bin/lib/audit-schema.mjs) and the dispatch skeleton. CI still runs no live audit: see `docs/known-ceilings.md`.
 
-- [ ] **Maintenance mode command** `OPEN`
-  New `/wp-maintenance` command to enable/disable maintenance mode — either via a custom template or by installing a maintenance plugin via WP-CLI.
+- [x] **Maintenance mode command** `DELIVERED`
+  [wp-maintenance](commands/wp-maintenance.md) turns maintenance mode on and off with a theme-owned switch instead of a plugin: it copies [maintenance.php](templates/maintenance/maintenance.php) into `inc/maintenance.php`, and the `<prefix>_maintenance` option makes the theme answer `503` with `Retry-After` to visitors who cannot `edit_posts`, anonymous REST included. On a store it uses WooCommerce's coming-soon mode. [The check](tests/checks/wp-maintenance.sh) runs the template against stubbed WordPress.
 
 - [x] **Favicon command** `DELIVERED`
   [wp-favicon](commands/wp-favicon.md) takes one square image, writes the 16, 32, 180, 192 and

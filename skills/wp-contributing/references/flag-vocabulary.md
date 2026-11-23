@@ -16,7 +16,7 @@ rediscover them from the command text.
 | Flag | Canonical meaning | Commands that carry it today |
 |---|---|---|
 | `--yes` | Skip a question the command would otherwise ask. Never skips a backup or a production gate. | `/wp-update` (skips "which updates"); `/wp-restore` (skips the confirmation, never the pre-restore copy); `/wp-adopt` passes `--yes` to `wp-config.mjs git-init --push` (see the tool flags below) |
-| `--force` | Replace or overwrite what already exists (a built theme, a seeded row, an icon, a client-edited value). The safety net, such as a backup, still runs. | `/wp-yolo` (discard the current build), `/wp-favicon` (replace the chosen icon), `/wp-cinematic-seed` (overwrite scene rows), `/wp-woo-setup` (take back values the client changed) |
+| `--force` | Replace or overwrite what already exists (a built theme, a seeded row, an icon, a client-edited value). The safety net, such as a backup, still runs. | `/wp-yolo` (discard the current build), `/wp-favicon` (replace the chosen icon), `/wp-maintenance` (replace an edited `inc/maintenance.php`), `/wp-cinematic-seed` (overwrite scene rows), `/wp-woo-setup` (take back values the client changed) |
 | `--dry-run` | Report what would change; write nothing. | `/wp-anonymize`, `/wp-restore`, `/wp-s3-media`, `/wp-cinematic-seed`; `/wp-adopt` and `/wp-debug` use it on a tool they call (see below) |
 | `--resume` | Continue an interrupted run from its recorded state instead of starting over. | `/wp-yolo` only |
 
