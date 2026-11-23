@@ -179,24 +179,6 @@ function webp_migrate_replace_string( $value, $map, &$hits ) {
 	return null === $result ? null : $result;
 }
 
-/** How many mapped old references a raw value names, read without rewriting anything. */
-function webp_migrate_count_refs( $raw, $map ) {
-	$found = preg_match_all( WEBP_MIGRATE_PATTERN, $raw, $all );
-	if ( false === $found ) {
-		return 1; // PCRE gave up on this value: count it, so verify cannot pass over it
-	}
-	if ( 0 === $found ) {
-		return 0;
-	}
-	$n = 0;
-	foreach ( $all[2] as $path ) {
-		if ( isset( $map[ str_replace( '\\/', '/', $path ) ] ) ) {
-			$n++;
-		}
-	}
-	return $n;
-}
-
 /**
  * Walk a decoded value. Strings that are themselves serialized (double serialization) are
  * decoded and re-encoded in turn, so their inner lengths stay right. Any object, any string
@@ -256,7 +238,11 @@ function webp_migrate_replace_cell( $raw, $map ) {
 		$new = webp_migrate_replace_value( $raw, $map, $hits, $unsafe );
 	}
 	if ( $unsafe ) {
-		return array( null, webp_migrate_count_refs( $raw, $map ) > 0 );
+		static $patterns = null;
+		if ( null === $patterns ) {
+			$patterns = webp_migrate_verify_patterns( $map );
+		}
+		return array( null, webp_migrate_names_old( $raw, $patterns ) );
 	}
 	return array( ( $hits > 0 && $new !== $raw ) ? $new : null, false );
 }
@@ -274,6 +260,10 @@ function webp_migrate_columns() {
 		 AND DATA_TYPE IN ('char','varchar','tinytext','text','mediumtext','longtext')",
 		$wpdb->esc_like( $wpdb->prefix ) . '%'
 	) );
+	webp_migrate_db_ok( 'information_schema' );
+	if ( ! $cols ) {
+		WP_CLI::error( 'webp-migrate: found no text columns in the prefixed tables; refusing to report a clean database' );
+	}
 	$pks = array();
 	$out = array();
 	foreach ( $cols as $col ) {
@@ -284,6 +274,7 @@ function webp_migrate_columns() {
 		}
 		if ( ! isset( $pks[ $t ] ) ) {
 			$pk         = $wpdb->get_col( "SHOW KEYS FROM `$t` WHERE Key_name = 'PRIMARY'", 4 );
+			webp_migrate_db_ok( "keys of $t" );
 			$pks[ $t ] = 1 === count( $pk ) ? $pk[0] : '';
 		}
 		$where = "`$c` LIKE '%.png%'";
@@ -307,7 +298,7 @@ function webp_migrate_replace_all( $map, $dry ) {
 	$unresolved = array();
 	foreach ( webp_migrate_columns() as list( $t, $c, $pk, $where ) ) {
 		if ( '' === $pk ) {
-			$n = webp_migrate_scan_column( $t, $c, $where, $map );
+			$n = webp_migrate_scan_column( $t, $c, '', $where, webp_migrate_verify_patterns( $map ) );
 			if ( $n ) {
 				$unresolved[ "$t.$c" ] = $n;
 			}
@@ -317,6 +308,8 @@ function webp_migrate_replace_all( $map, $dry ) {
 		do {
 			$sql  = "SELECT `$pk` AS k, `$c` AS v FROM `$t` WHERE $where" . ( null === $last ? '' : $wpdb->prepare( " AND `$pk` > %s", $last ) ) . " ORDER BY `$pk` LIMIT 500";
 			$rows = $wpdb->get_results( $sql );
+			webp_migrate_db_ok( "$t.$c" );
+			$rows = (array) $rows;
 			foreach ( $rows as $row ) {
 				$last = $row->k;
 				list( $new, $stuck ) = webp_migrate_replace_cell( (string) $row->v, $map );
@@ -329,7 +322,9 @@ function webp_migrate_replace_all( $map, $dry ) {
 				$total++;
 				$per[ "$t.$c" ] = isset( $per[ "$t.$c" ] ) ? $per[ "$t.$c" ] + 1 : 1;
 				if ( ! $dry ) {
-					$wpdb->update( $t, array( $c => $new ), array( $pk => $row->k ) );
+					if ( false === $wpdb->update( $t, array( $c => $new ), array( $pk => $row->k ) ) ) {
+						WP_CLI::error( "webp-migrate: could not update $t.$c row " . $row->k . ': ' . $wpdb->last_error );
+					}
 				}
 			}
 		} while ( count( $rows ) === 500 );
@@ -340,32 +335,88 @@ function webp_migrate_replace_all( $map, $dry ) {
 	return array( $total, $per, $unresolved );
 }
 
-/** Rows of one column whose raw value still names a mapped old file. Read-only. */
-function webp_migrate_scan_column( $t, $c, $where, $map ) {
+/** Stop on a failed query: an empty result read as "no rows" would let verify pass. */
+function webp_migrate_db_ok( $what ) {
 	global $wpdb;
-	$n      = 0;
-	$offset = 0;
-	do {
-		$vals = $wpdb->get_col( "SELECT `$c` FROM `$t` WHERE $where LIMIT 500 OFFSET $offset" );
-		foreach ( $vals as $v ) {
-			if ( webp_migrate_count_refs( (string) $v, $map ) > 0 ) {
+	if ( '' !== (string) $wpdb->last_error ) {
+		WP_CLI::error( 'webp-migrate: query failed (' . $what . '): ' . $wpdb->last_error );
+	}
+}
+
+/**
+ * Verify's matcher, deliberately not replace's pattern: any occurrence of an old file's base
+ * name, plain or percent-encoded, in any surrounding (JSON escaped twice, a trailing dot,
+ * spaces, brackets), except as Robin's `<name>.png.webp` sibling. A base name shared with a
+ * file outside the map also matches: a false alarm is fixable, a false all-clear moves files
+ * that are still in use. Returns a list of regexes over chunks of the names.
+ */
+function webp_migrate_verify_patterns( $map ) {
+	$names = array();
+	foreach ( array_keys( $map ) as $rel ) {
+		$base                           = basename( $rel );
+		$names[ preg_quote( $base, '~' ) ] = true;
+		$names[ preg_quote( rawurlencode( $base ), '~' ) ] = true;
+	}
+	$patterns = array();
+	foreach ( array_chunk( array_keys( $names ), 400 ) as $chunk ) {
+		$patterns[] = '~(?:' . implode( '|', $chunk ) . ')(?!\.webp)~i';
+	}
+	return $patterns;
+}
+
+function webp_migrate_names_old( $raw, $patterns ) {
+	foreach ( $patterns as $re ) {
+		$hit = preg_match( $re, $raw );
+		if ( 0 !== $hit ) {
+			return true; // a match, or PCRE gave up (false): count it either way
+		}
+	}
+	return false;
+}
+
+/**
+ * Rows of one column that still name an old file. Read-only. Keyset pages by the primary key
+ * when there is one; a table without one is read in a single query, so no page can skip a row.
+ */
+function webp_migrate_scan_column( $t, $c, $pk, $where, $patterns ) {
+	global $wpdb;
+	$n = 0;
+	if ( '' === $pk ) {
+		$vals = $wpdb->get_col( "SELECT `$c` FROM `$t` WHERE $where" );
+		webp_migrate_db_ok( "$t.$c" );
+		foreach ( (array) $vals as $v ) {
+			if ( webp_migrate_names_old( (string) $v, $patterns ) ) {
 				$n++;
 			}
 		}
-		$offset += 500;
-	} while ( count( $vals ) === 500 );
+		return $n;
+	}
+	$last = null;
+	do {
+		$rows = $wpdb->get_results( "SELECT `$pk` AS k, `$c` AS v FROM `$t` WHERE $where" . ( null === $last ? '' : $wpdb->prepare( " AND `$pk` > %s", $last ) ) . " ORDER BY `$pk` LIMIT 500" );
+		webp_migrate_db_ok( "$t.$c" );
+		$rows = (array) $rows;
+		foreach ( $rows as $row ) {
+			$last = $row->k;
+			if ( webp_migrate_names_old( (string) $row->v, $patterns ) ) {
+				$n++;
+			}
+		}
+	} while ( count( $rows ) === 500 );
 	return $n;
 }
 
 /**
  * Verify's database half: rows whose raw value still names an old file, per column. It reads
- * the stored bytes and never decodes them, so a value replace could not rewrite still counts.
+ * the stored bytes with its own matcher and never decodes them, so a value replace could not
+ * rewrite, or a reference replace's pattern does not see, still counts.
  */
 function webp_migrate_scan_all( $map ) {
-	$total = 0;
-	$per   = array();
-	foreach ( webp_migrate_columns() as list( $t, $c, , $where ) ) {
-		$n = webp_migrate_scan_column( $t, $c, $where, $map );
+	$patterns = webp_migrate_verify_patterns( $map );
+	$total    = 0;
+	$per      = array();
+	foreach ( webp_migrate_columns() as list( $t, $c, $pk, $where ) ) {
+		$n = webp_migrate_scan_column( $t, $c, $pk, $where, $patterns );
 		if ( $n ) {
 			$per[ "$t.$c" ] = $n;
 			$total         += $n;

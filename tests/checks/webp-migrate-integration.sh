@@ -81,6 +81,14 @@ guid_before=$(q "echo get_post_field('guid',$big);")
 q "update_option('fx_obj', (object) array('logo' => '$small_url'));"
 q "global \$wpdb; \$wpdb->query(\"CREATE TABLE {\$wpdb->prefix}fx_nopk (v TEXT)\"); \$wpdb->insert(\$wpdb->prefix . 'fx_nopk', array('v' => '$small_url'));"
 q "update_post_meta($post, 'fx_double', serialize(array('u' => '$small_url')));"
+# JSON inside JSON: the slashes escaped twice. replace's pattern does not read it; verify must.
+cat > "$SCRATCH/nested.php" <<'PHP'
+<?php
+// wp_json_encode escapes slashes, so a URL encoded twice carries uploads\\\/ in the stored row.
+$inner = wp_json_encode( array( 'u' => $args[1] ) );
+update_post_meta( (int) $args[0], 'fx_nested_json', wp_slash( wp_json_encode( array( 'inner' => $inner ) ) ) );
+PHP
+$WP eval-file "$SCRATCH/nested.php" "$post" "$small_url" >/dev/null
 
 # A workdir inside the WordPress root is refused.
 if run plan "$DIR/wp-content/webp-work" >/dev/null; then fail "a workdir inside the WordPress root was accepted"; fi
@@ -145,7 +153,10 @@ u=r['unresolved']; assert any(k.endswith('options.option_value') for k in u) and
 if run verify "$WORK" >/dev/null; then fail "verify passed while an object option and a keyless table still name old files"; fi
 if run move-aside "$WORK" "backup=$BACKUP" >/dev/null; then fail "move-aside ran while verify fails"; fi
 [ -n "$(find "$(q 'echo wp_upload_dir()["basedir"];')" -name '*.png' | sed -n 1p)" ] || fail "a refused move-aside moved files"
+q "echo get_post_meta($post,'fx_nested_json',true);" | grep -cF 'uploads\\\/' >/dev/null || fail "the twice-escaped fixture did not store two escape levels"
 q "delete_option('fx_obj'); global \$wpdb; \$wpdb->query(\"DROP TABLE {\$wpdb->prefix}fx_nopk\");"
+if run verify "$WORK" >/dev/null; then fail "verify passed while a twice-escaped JSON reference still names an old file"; fi
+q "delete_post_meta($post, 'fx_nested_json');"
 
 out=$(run verify "$WORK") || fail "verify failed after replace: $out"
 
