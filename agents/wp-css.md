@@ -11,6 +11,11 @@ You are a CSS design system specialist for WordPress themes. You generate clean,
 
 ## First Action (MANDATORY)
 
+**Store layer.** When the dispatch says **"store layer"**, the file you read and write is the
+theme's `assets/css/store.css`, not `assets/css/styles.css` (a tailwind theme has none): go
+straight to **Store Layer Mode** at the end of this file. Everything else in this block applies
+to the other modes.
+
 **Blocked contract.** If `assets/css/styles.css` is missing or unreadable, stop and return `BLOCKED: <reason>` plus the files you already touched (`touched: none` when there are none). Use the same line for any other blocker you cannot work around. Contract: `skills/wp-contributing/SKILL.md` § Agent contracts.
 
 Before generating ANY CSS, read the project's existing `assets/css/styles.css` file. Extract:
@@ -583,3 +588,49 @@ survives. Frozen as px inside a `max-width: 767.98px` query, the element keeps i
 Convert any width, inset or overhang that is a fraction of the content track into a
 percentage; keep px only for what genuinely does not scale — a border, an icon the design
 repeats at one size.
+
+## Store Layer Mode (when dispatched by /wp-yolo for the demo's store pages)
+
+A demo's store pages (`pages[role=store]`) build no template: WooCommerce renders shop,
+product, cart, checkout and my account with its own markup, and `assets/css/store.css` styles
+that markup on store pages only. Your job is the last section of that file, the one headed
+`Section: Store demo`, written from the demo's store pages.
+
+**Read first:**
+- the theme's `assets/css/store.css` — whole. If it is missing, or has no
+  `Section: Store demo` line, return `BLOCKED: store.css is not installed` and `touched: none`.
+- `${CLAUDE_PLUGIN_ROOT}/skills/wp-woocommerce/references/store-selectors.md` — the selector
+  that carries each element of each surface, and the traps.
+- the theme's `assets/css/src/tailwindcss/main.css` `@theme` block — the token names and values
+  the theme declares.
+- the demo store pages the dispatch names, each with its `store` surface, in their plain-CSS
+  form: `demo/.original/<slug>.html` (the backup `/wp-yolo` keeps before its Tailwind
+  conversion) and the stylesheets it links, or `demo/<slug>.html` when there is no backup. The
+  declared values come from there; the converted page's utility classes do not exist in
+  `store.css`, which is plain CSS outside the Tailwind build.
+
+**Write only below the `Section: Store demo` line.** Everything above it is a fixed file that
+`/wp-woo-setup` compares and replaces; an edit there makes its next run stop with `EDITED`.
+Replace what is below the line; never touch a byte above it.
+
+**What goes in, in this order:**
+1. One `body.woocommerce-page { … }` rule overriding the `--store-*` properties from the
+   **Store tokens** section with the demo's values: its text colour into `--store-ink`, page
+   background into `--store-canvas`, primary button background and text into `--store-accent`
+   and `--store-on-accent`, and so on. The dispatch also lists the theme tokens the base reads
+   but the theme does not declare (a craft palette renames them); map each `--store-*` that
+   reads one of those to the theme's own token, or to the demo's literal.
+2. Then one rule per demo element the store pages draw and the overrides cannot express —
+   a card's padding and border, a grid's columns and gap, a button's radius and padding, a
+   title's size — on the selector `store-selectors.md` names for that element, prefixed with
+   its surface's body class.
+
+**Transcription, as in Transcription Mode above:** copy the demo's exact declared values; use
+`var(--x)` only when the theme's `@theme` declares `--x` with exactly that value; never
+invent a token. Never copy a demo class: no demo class exists on WooCommerce's pages, so a
+`.shop-card__title` rule styles nothing. An element with no row in `store-selectors.md` is
+skipped and named in your report, never guessed onto a nearby selector. Keep the base's
+behaviour: no `!important`, no rule outside a store body class.
+
+**Report:** the surfaces and demo pages you read, every `--store-*` you overrode with its
+value, every rule you wrote with the demo element it carries, and every element you skipped.

@@ -30,7 +30,9 @@ a profile plugin with no row under Picks, or one listed under Avoid.
 
 A demo's store pages (shop, product, cart, checkout, account) are `role: store` in the
 `/wp-yolo` manifest: WooCommerce renders those URLs, so no WP Page or section build comes from
-them.
+them. Their look goes into the `Section: Store demo` of the theme's `assets/css/store.css`,
+written on WooCommerce's own selectors: `references/store-selectors.md` maps each element a
+demo's store page draws to the selector that carries it, measured on WooCommerce 11.1.2.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the

@@ -21,6 +21,7 @@ read it whole and follow it in order.
 | 2.6 | [references/demo-conversion.md](references/demo-conversion.md) | In-place Tailwind conversion with a backup, per-page detection, repeated cards, failure handling |
 | 3 | [references/checkpoint.md](references/checkpoint.md) | The build plan, approve / edit / abort, what follows an abort, `--resume` as the only continuation |
 | 4.0 | [references/build-ledger.md](references/build-ledger.md) | The unit, the ledger file, a generated file someone else changed, `--resume`, verifying before skipping |
+| 4 (item 7) | [references/store-layer.md](references/store-layer.md) | Store pages: installing `store.css` with `/wp-woo-setup --store-theme`, the `wp-css` store layer dispatch, verifying its section |
 | 4.4 | [references/apply-promotion.md](references/apply-promotion.md) | The single author-mode `wp-tailwind` promotion pass after the walk |
 | 4.5 | [references/font-carry.md](references/font-carry.md) | Collecting `section.fonts[]`, an empty collection, self-hosting each family |
 | 4.6 | [references/behaviour-carry.md](references/behaviour-carry.md) | Porting every demo script and proving it runs before Step 5 |

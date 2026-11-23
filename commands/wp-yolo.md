@@ -353,6 +353,11 @@ Drive the existing commands/agents in this exact order, reading everything from 
    as "store page (`<store>`), rendered by WooCommerce"; with no `store` block in
    `.wp-create.json`, add "run /wp-woo-setup first". Links to them (nav, buttons) are not
    rewired: list each as "link to `<slug>`: point it at WooCommerce's `<store>` page".
+   Their look is carried once, for all of them: read
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/store-layer.md` now and follow it — on
+   a `tailwind` theme with a `store` block it installs the store stylesheet with
+   `/wp-woo-setup --store-theme` and has `wp-css` write the demo's store styling into its
+   `Section: Store demo`.
 8. **Blog** — if any `pages[role=blog]` entry exists, run `/wp-page blog`.
 9. **Mandatory system pages — always, regardless of demo content:**
    - `/wp-page 404`

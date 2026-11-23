@@ -7,6 +7,8 @@
 #   - after install, shop and product pages use WooCommerce's templates inside one <main> and
 #     one id="primary", with the gallery scripts and no sidebar fallback notice;
 #   - the stylesheet is linked on shop, product, cart and my account, and on no other page.
+#   - every selector skills/wp-woocommerce/references/store-selectors.md probes exists here:
+#     in the served page, or in WooCommerce's block scripts for what renders client-side.
 #
 # SKIPs unless WP_FIXTURE=1, like the other fixture-backed checks. It provisions its own store
 # fixture (WP_FIXTURE_STORE=1).
@@ -110,6 +112,51 @@ done
 for page in "" plain-page/ "?s=mug"; do
   has 'fx-theme-store-css' "$(get "$page")" && fail "store.css is linked on a page that is not a store page: /$page"
 done
+
+# The store layer's selector reference against this WooCommerce: every `html` row's classes
+# are in the page WordPress serves, every `js` row's classes are in WooCommerce's block
+# scripts, and the float grid the reference warns about is still WooCommerce's layout.
+for page in shop product/fixture-mug cart my-account; do
+  get "$page/" > "$DIR/probe-${page%%/*}.html"
+done
+python3 - skills/wp-woocommerce/references/store-selectors.md "$DIR" <<'PY' || exit 1
+import glob, re, sys
+ref, root = sys.argv[1], sys.argv[2]
+def die(msg):
+    print("FAIL: " + msg); sys.exit(1)
+pages = {"Shop": "shop", "Product": "product", "Cart": "cart", "My account": "my-account"}
+scripts = "".join(open(f, errors="replace").read()
+                  for f in glob.glob(f"{root}/wp-content/plugins/woocommerce/assets/client/blocks/*.js"))
+if not scripts:
+    die("found no WooCommerce block scripts to probe")
+surface, probed = None, 0
+for line in open(ref):
+    h = re.match(r'^## (Shop|Product|Cart|Checkout|My account) ', line)
+    if h:
+        surface = h.group(1); continue
+    row = re.match(r'^\| (.+?) \| `(.+?)` \| (html|js) \|$', line.rstrip("\n"))
+    if not row:
+        continue
+    elem, selector, probe = row.groups()
+    classes = re.findall(r'\.([A-Za-z_][\w-]*)', selector)
+    if probe == "html":
+        if surface not in pages:
+            die(f"{surface}: '{elem}' is probed html, but this check serves no {surface} page")
+        html = open(f"{root}/probe-{pages[surface]}.html", errors="replace").read()
+        served = set(c for attr in re.findall(r'class="([^"]*)"', html) for c in attr.split())
+        missing = [c for c in classes if c not in served]
+    else:
+        missing = [c for c in classes if c not in scripts]
+    if missing:
+        die(f"{surface}: '{elem}' ({selector}) — {', '.join(missing)} not found ({probe}) on WooCommerce here")
+    probed += 1
+if probed < 25:
+    die(f"only {probed} selector rows probed; the reference lost its probes")
+layout = open(f"{root}/wp-content/plugins/woocommerce/assets/css/woocommerce-layout.css").read()
+if not re.search(r'ul\.products li\.product\{float:left', layout):
+    die("WooCommerce no longer floats ul.products li.product; the reference's grid trap is stale")
+PY
+
 if grep -E 'PHP (Fatal|Warning|Notice|Deprecated)' "$DIR/store-theme-server.log" >/dev/null; then
   grep -E 'PHP (Fatal|Warning|Notice|Deprecated)' "$DIR/store-theme-server.log" | sed -n 1,3p
   fail "PHP reported errors while serving the store pages"
