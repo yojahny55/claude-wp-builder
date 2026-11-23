@@ -504,7 +504,8 @@ export function validateStore(store) {
       p.push(`${s.manifestPath} is a secret: put it in ${LOCAL_NAME} or ${s.env}, never in the manifest`);
     }
   }
-  unknownKeys(store, ['tier', 'address', 'currency', 'units', 'checkout', 'checkout_reason', 'enquiry', 'payments', 'shipping', 'tax'], 'store', p);
+  unknownKeys(store, ['tier', 'address', 'currency', 'units', 'checkout', 'checkout_reason', 'enquiry', 'payments', 'shipping', 'tax', 'launch'], 'store', p);
+  if (store.launch !== undefined) validateLaunch(store.launch, p);
   const { tier } = store;
   if (!STORE_TIERS.includes(tier)) p.push(`store.tier must be ${STORE_TIERS.map((t) => `"${t}"`).join(', ')}, found ${JSON.stringify(tier)}`);
   const sells = tier === 'store' || tier === 'full';
@@ -563,6 +564,20 @@ export function validateStore(store) {
   if (store.shipping !== undefined) validateShipping(store.shipping, p);
   if (store.tax !== undefined) validateTax(store.tax, p);
   return p;
+}
+
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/;
+const isoTime = (v) => typeof v === 'string' && ISO_TIME.test(v) && !Number.isNaN(Date.parse(v));
+
+// Written by /wp-woo-launch, never by hand: when the store went live, the backup taken just
+// before, and when --revert put it back to coming soon. Its presence is what stops
+// /wp-woo-setup from ever writing launch state again; payments.mode stays "test" regardless.
+function validateLaunch(launch, p) {
+  if (!isObj(launch)) { p.push('store.launch must be an object: at and backup, written by /wp-woo-launch'); return; }
+  unknownKeys(launch, ['at', 'backup', 'reverted_at'], 'store.launch', p);
+  if (!isoTime(launch.at)) p.push('store.launch.at must be an ISO 8601 timestamp');
+  if (typeof launch.backup !== 'string' || !launch.backup.startsWith('/')) p.push('store.launch.backup must be the absolute path of the pre-launch backup folder');
+  if (launch.reverted_at !== undefined && !isoTime(launch.reverted_at)) p.push('store.launch.reverted_at must be an ISO 8601 timestamp');
 }
 
 function validateShipping(shipping, p) {

@@ -112,7 +112,7 @@ Idempotent — re-run after the client changes scope.
 
 ```
 /wp-woo-setup [project-path]           # ask, record the store block, dry run, apply
-/wp-woo-setup [project-path] --force   # also take back values the client changed, except launch state on a store with orders
+/wp-woo-setup [project-path] --force   # also take back values the client changed, except launch state on a store with orders or a launched one
 ```
 
 Records what the store sells and how in the `store` block of `.wp-create.json` — tier
@@ -144,6 +144,26 @@ in a cart and takes it out (a catalog refuses it). The cart session it opens is 
 order, it places one order through the Store API, checks the new-order email was sent, then
 cancels the order, so the stock and sales count go back, and deletes it for good. Exit 0 all
 passed, 1 a check failed or `--order` was refused, 2 the site or WP-CLI did not answer.
+
+### `/wp-woo-launch`
+
+```
+/wp-woo-launch [project-path]                    # check only: production, live keys, verify, store audit; writes nothing
+/wp-woo-launch [project-path]                    # then, once the operator types the site's host: backup, launch, verify, record
+/wp-woo-launch [project-path] --backup-out <dir> # where the pre-launch backup goes
+/wp-woo-launch [project-path] --revert           # coming soon again, nothing else
+```
+
+Takes a store `/wp-woo-setup` set up live, with `bin/woo-launch.mjs`. It runs only on a
+production site, and checks without writing them that the live Stripe keys
+(`STORE_KIT_STRIPE_*`, webhook secret included) and real Turnstile keys (`CF_TURNSTILE_*`) are
+in `wp-config.php`; `/wp-woo-verify` must pass, and the store audit must have no `CRITICAL`
+finding but the launch itself, nor empty terms or refund pages. Then the operator types the
+site's host, a verified `pre-launch` backup is taken, and Stripe goes live, cash on delivery
+off, Turnstile on the checkout and coming soon off, in that order. A live store that fails the
+final verify goes back to coming soon. `store.launch` records the launch and its backup, and
+from then on `/wp-woo-setup` never writes launch state. Never run from `/wp-yolo`. Exit 0
+ready, launched or reverted, 1 blocked or refused, 2 the site or WP-CLI did not answer.
 
 ---
 

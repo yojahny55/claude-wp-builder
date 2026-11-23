@@ -63,7 +63,8 @@ for rule in 'which a store with orders never has written for it, absent or not, 
             'Configure Stripe with API keys, not "Connect with Stripe"' \
             '`store.checkout: shortcode` only with a written reason in `store.checkout_reason`' \
             'Cash on delivery only in a `local` environment' \
-            'No command takes a store live' \
+            'Only `/wp-woo-launch` takes a store live' \
+            'Neither does a store `/wp-woo-launch` launched' \
             '`store.tier`' '`store.enquiry`' '`store.payments.mode`' \
             'Arguments** are bare words' '**Exit `1`**: refused' '**Report-only:**' \
             'Read it before adding, removing or swapping a plugin in a store profile'; do

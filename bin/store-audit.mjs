@@ -83,7 +83,7 @@ const FIX = {
   'STORE-011': 'Give each listed product a price, an image and a category of its own in WooCommerce.',
   'STORE-012': 'Read the failed actions in WooCommerce > Status > Scheduled Actions; fix what makes them fail, then run them again.',
   'STORE-013': 'Let WooCommerce finish the sync (WooCommerce > Settings > Advanced > Features), or run wp wc hpos sync.',
-  'STORE-014': 'Launch the store on purpose, in the launch order of skills/wp-woocommerce; never by switching these off one by one.',
+  'STORE-014': 'Launch the store with /wp-woo-launch on the production site; never by switching these off one by one.',
 };
 const SEVERITY = { 'STORE-001': 'WARNING', 'STORE-002': 'CRITICAL', 'STORE-003': 'CRITICAL', 'STORE-004': 'CRITICAL' };
 const OWNER = { 'STORE-001': 'setting', 'STORE-002': 'setting', 'STORE-003': 'content', 'STORE-004': 'setting' };

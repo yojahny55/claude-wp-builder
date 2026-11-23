@@ -85,5 +85,6 @@ the `N/A` and `UNMEASURED` ids with their reasons. Return the JSON and a summary
 
 Every store fix is `auto_fixable: false`. Drift and store pages are `/wp-woo-setup`; products
 are `/wp-seed --products` or the merchant; policy pages are text the client writes; the launch
-state is the launch step in `skills/wp-woocommerce`, never a setting switched off on its own.
+state is `/wp-woo-launch`, run by the operator on production, never a setting switched off on
+its own.
 The `fix` field names which.

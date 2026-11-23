@@ -49,6 +49,9 @@ because variations are not built. `/wp-woo-verify` checks the result from outsid
 the checks that read the database: policy pages, email sender, shipping, tax, product data,
 failed scheduled actions, order-table sync and launch state. It writes nothing; it is not run
 by hand either.
+`/wp-woo-launch` runs `bin/woo-launch.mjs`, which checks through `scripts/woo-launch.php`,
+runs both of the above, takes the backup, launches through the same script, and records
+`store.launch`; nothing in it is run by hand.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the
@@ -104,10 +107,11 @@ Measured on WooCommerce 11.1.2 unless marked (source).
 - **Test mode, always.** `store.payments.mode` is `test`, and the validator accepts nothing
   else. Cash on delivery only in a `local` environment, for the automated test order; "coming
   soon" everywhere else.
-- **No command takes a store live.** Live Stripe keys, test mode and "coming soon" off, cash on
-  delivery off and real Turnstile keys are one launch step with a fixed order, and it is not
-  built: setup refuses a live key. Do not change these by hand — stop and hand the launch to
-  the operator.
+- **Only `/wp-woo-launch` takes a store live.** Live Stripe keys, test mode and "coming soon"
+  off, cash on delivery off and real Turnstile keys are one launch step with a fixed order:
+  production only, keys checked in `wp-config.php` and never written, a verified backup first,
+  the operator typing the site's host, coming soon off last. Setup refuses a live key. Do not
+  change these by hand, and never run the launch from another command — hand it to the operator.
 - **Abandoned-cart email depends on the market.** The US is opt-out (CAN-SPAM); the UK allows a
   soft opt-in only for an address typed at checkout; in the EU — Germany above all — treat it as
   advertising that needs prior consent.
@@ -134,7 +138,8 @@ Setup records a hash of every value it writes in `store_kit_setup_state`; a valu
 longer matches that hash is the client's and is left alone unless `force` is passed. The one
 exception is launch state — "coming soon", Stripe's `enabled`/`testmode`, cash on delivery —
 which a store with orders never has written for it, absent or not, force or not: change it in
-WooCommerce instead.
+WooCommerce instead. Neither does a store `/wp-woo-launch` launched: once `store.launch` is in
+the manifest, launch state is the launch's, `--revert` included.
 
 `scripts/woo-lib.php` holds setup's decisions with no WordPress calls, so
 `tests/checks/woo-lib.sh` runs them under bare PHP. Read it to see how a value is compared or
