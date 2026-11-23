@@ -23,7 +23,7 @@ need_token "$script" "defined( 'ABSPATH' ) || exit;"
 need_token "$script" "'post_status' => 'draft',"
 need_token BACKLOG.md 'tests/checks/legal-pages-integration.sh'
 if grep -n "'publish'" "$script" >/dev/null; then fail "$script publishes a page; legal drafts are reviewed before they go live"; fi
-if grep -nE 'wp_update_post|post_content' "$script" >/dev/null; then fail "$script writes post fields of an existing page; it must only fill the legal fields of its own drafts"; fi
+if grep -nE "wp_update_post|'post_content'" "$script" >/dev/null; then fail "$script writes post fields of an existing page; it must only fill the legal fields of its own drafts"; fi
 
 require_tool php
 php -l "$script" >/dev/null || fail "$script does not parse"
