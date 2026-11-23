@@ -24,7 +24,8 @@ what differs back to the CSS agent, at most three times.
   sees.
 - The section has no content yet (2 below). `--visual` is for a section whose page has been
   seeded (`/wp-seed`, or edited by hand); `/wp-yolo` builds every section before it seeds, so
-  it does not pass the flag.
+  it never passes the flag to `/wp-section`. `/wp-yolo --visual` runs this file itself, once
+  the pages are seeded (its Step 5, item 3).
 
 ## 1. The page that shows the section
 
@@ -38,7 +39,15 @@ what differs back to the CSS agent, at most three times.
     --meta_value=<target> --fields=ID,url --posts_per_page=1
   ```
 
-  No page: skip, and say "visual: not measured (no published page uses <target>)". Never
+  WordPress also applies `page-<slug>.php` to the page whose slug is `<slug>` without any
+  `_wp_page_template` meta, which is how `/wp-seed` pages get their template. So when that
+  query returns nothing and the target is `page-<slug>.php`, ask for the page by slug:
+
+  ```bash
+  $WP post list --post_type=page --post_status=publish --name=<slug> --fields=ID,url --posts_per_page=1
+  ```
+
+  No page either way: skip, and say "visual: not measured (no published page uses <target>)". Never
   create a page to measure.
 
 ## 2. Is the section seeded?

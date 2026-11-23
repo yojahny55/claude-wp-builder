@@ -24,6 +24,7 @@ read it whole and follow it in order.
 | 4.4 | [references/apply-promotion.md](references/apply-promotion.md) | The single author-mode `wp-tailwind` promotion pass after the walk |
 | 4.5 | [references/font-carry.md](references/font-carry.md) | Collecting `section.fonts[]`, an empty collection, self-hosting each family |
 | 4.6 | [references/behaviour-carry.md](references/behaviour-carry.md) | Porting every demo script and proving it runs before Step 5 |
+| 5 (item 3) | [references/visual-pass.md](references/visual-pass.md) | `--visual` only: the per-section visual check after seeding, one section at a time, never blocking |
 | 5.5 | [references/parity-gate.md](references/parity-gate.md) | Auto-fixing mechanical parity findings per template, re-verifying, blocking |
 
 ## Changing a step
