@@ -82,6 +82,8 @@ check( 'categories must be names', err( array( 'name' => 'A', 'regular_price' =>
 check( 'sku is the identity', entry( array( 'name' => 'Mug', 'sku' => 'M-1', 'regular_price' => '1' ) )['key'], 'sku:M-1' );
 check( 'key without a sku', entry( array( 'name' => 'Mug', 'key' => 'The Mug', 'regular_price' => '1' ) )['key'], 'the-mug' );
 check( 'the name slugified', entry( array( 'name' => 'Big Mug!', 'regular_price' => '1' ) )['key'], 'big-mug' );
+setlocale( LC_ALL, 'C' );
+check( 'accents fold the same under any locale', entry( array( 'name' => 'Café Ñandú Øl', 'regular_price' => '1' ) )['key'], 'cafe-nandu-ol' );
 $two = prodseed_normalize_all( array( array( 'name' => 'Mug', 'regular_price' => '1' ), array( 'name' => 'mug', 'regular_price' => '2' ) ), '/demo' );
 check( 'one identity twice is an error on the second', array( count( $two['entries'] ), $two['errors'] ), array( 1, array( 'mug: same identity (mug) as Mug; give one of them a sku or a key' ) ) );
 

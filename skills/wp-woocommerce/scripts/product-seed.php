@@ -179,7 +179,9 @@ function prodseed_current( $product ) {
 		}
 		$term = get_term( $cat_id, 'product_cat' );
 		if ( $term && ! is_wp_error( $term ) ) {
-			$cats[] = $term->name;
+			// WordPress stores a term name with its entities escaped (`Home &amp; Garden`);
+			// the source has the plain name.
+			$cats[] = html_entity_decode( $term->name, ENT_QUOTES, 'UTF-8' );
 		}
 	}
 	sort( $cats, SORT_STRING );

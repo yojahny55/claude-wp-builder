@@ -27,15 +27,25 @@ function prodseed_fields() {
 	return array( 'name', 'regular_price', 'sale_price', 'short_description', 'description', 'categories', 'image', 'gallery', 'external_url', 'button_text' );
 }
 
-/** A lowercase ASCII slug; '' when nothing is left. */
+/**
+ * A lowercase ASCII slug; '' when nothing is left. It is a product's identity between runs, so it
+ * must not depend on the process: a fixed table, never iconv(), whose transliteration follows
+ * the locale (`Café` is `cafe` under a UTF-8 locale and `caf` under C).
+ */
 function prodseed_slug( $text ) {
-	$text = strtolower( (string) $text );
-	if ( function_exists( 'iconv' ) ) {
-		$ascii = @iconv( 'UTF-8', 'ASCII//TRANSLIT//IGNORE', $text );
-		if ( false !== $ascii ) {
-			$text = strtolower( $ascii );
-		}
-	}
+	static $map = array(
+		'á' => 'a', 'à' => 'a', 'â' => 'a', 'ä' => 'a', 'ã' => 'a', 'å' => 'a', 'æ' => 'ae',
+		'ç' => 'c', 'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'í' => 'i', 'ì' => 'i',
+		'î' => 'i', 'ï' => 'i', 'ñ' => 'n', 'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'ö' => 'o',
+		'õ' => 'o', 'ø' => 'o', 'œ' => 'oe', 'ß' => 'ss', 'ú' => 'u', 'ù' => 'u', 'û' => 'u',
+		'ü' => 'u', 'ý' => 'y', 'ÿ' => 'y',
+		'Á' => 'a', 'À' => 'a', 'Â' => 'a', 'Ä' => 'a', 'Ã' => 'a', 'Å' => 'a', 'Æ' => 'ae',
+		'Ç' => 'c', 'É' => 'e', 'È' => 'e', 'Ê' => 'e', 'Ë' => 'e', 'Í' => 'i', 'Ì' => 'i',
+		'Î' => 'i', 'Ï' => 'i', 'Ñ' => 'n', 'Ó' => 'o', 'Ò' => 'o', 'Ô' => 'o', 'Ö' => 'o',
+		'Õ' => 'o', 'Ø' => 'o', 'Œ' => 'oe', 'Ú' => 'u', 'Ù' => 'u', 'Û' => 'u', 'Ü' => 'u',
+		'Ý' => 'y',
+	);
+	$text = strtolower( strtr( (string) $text, $map ) );
 	return trim( (string) preg_replace( '/[^a-z0-9]+/', '-', $text ), '-' );
 }
 

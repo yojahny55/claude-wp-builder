@@ -49,7 +49,7 @@ products="$WORK/project/demo/products.json"
 write_products() { # <mug price> <tote description>
   cat >"$products" <<JSON
 { "products": [
-  { "name": "Stoneware Mug", "sku": "MUG-1", "regular_price": "$1", "categories": ["Kitchen", "Mugs"],
+  { "name": "Stoneware Mug", "sku": "MUG-1", "regular_price": "$1", "categories": ["Kitchen", "Mugs", "Pots & Pans", "Chef's"],
     "image": "img/mug.png", "short_description": "Hand thrown.", "source": "shop.html" },
   { "name": "Canvas Tote", "regular_price": "30.00", "sale_price": "24.00", "description": "$2" },
   { "name": "Dealer Lamp", "regular_price": "80", "external_url": "https://dealer.example/lamp", "button_text": "Buy at the dealer" },
@@ -81,7 +81,7 @@ has "$got" 'review linen-shirt: options Size are not built as variations'
 MUG=$(pid MUG-1)
 [ "${MUG:-0}" -gt 0 ] || fail "no product with sku MUG-1"
 facts=$($WP eval "\$p = wc_get_product( $MUG ); \$c = wp_get_post_terms( $MUG, 'product_cat', array( 'fields' => 'names' ) ); sort( \$c ); echo implode( '|', array( \$p->get_type(), \$p->get_status(), \$p->get_regular_price(), implode( ',', \$c ), get_post_meta( \$p->get_image_id(), '_acme_seeded_source', true ), user_can( (int) get_post_field( 'post_author', $MUG ), 'administrator' ) ? 'admin' : 'nobody' ) );" 2>/dev/null)
-[ "$facts" = "simple|publish|12.00|Kitchen,Mugs|$WORK/project/demo/img/mug.png|admin" ] || fail "the mug is not what the source says: $facts"
+[ "$facts" = "simple|publish|12.00|Chef's,Kitchen,Mugs,Pots &amp; Pans|$WORK/project/demo/img/mug.png|admin" ] || fail "the mug is not what the source says: $facts"
 [ -f "$WORK/project/demo/img/mug.png" ] || fail "importing the image moved the demo's own file"
 TOTE=$(by_name "Canvas Tote")
 [ "$($WP eval "\$p = wc_get_product( $TOTE ); echo \$p->get_regular_price() . '/' . \$p->get_sale_price();" 2>/dev/null)" = "30.00/24.00" ] || fail "the tote's sale price is wrong"
