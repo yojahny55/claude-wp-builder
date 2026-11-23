@@ -162,9 +162,9 @@ for (const [w, h, label] of [[1280, 800, '1280'], [390, 844, '390']]) {
 // colour or a font change fails here instead of reporting coverage it does not have.
 //
 // The text-colour mutant moves two grey steps (#374151 to the caption's #6b7280), not one.
-// Measured: one step either way (#4b5563, #1f2937) differs by 0.0000%, because thin glyph
-// pixels that close stay under pixelmatch's per-pixel threshold; two steps differ by
-// 0.29-0.37%. A one-step tint is the parity gate's to catch (computed styles), not these
+// Measured in a local Chromium: one step either way (#4b5563, #1f2937) differs by 0.0000%,
+// because thin glyph pixels that close stay under pixelmatch's per-pixel threshold; two
+// steps differ by 0.29-0.37% there, and by 0.55% in the pinned renderer. A one-step tint is the parity gate's to catch (computed styles), not these
 // pixels', and docs/testing.md says so.
 const MUTANTS = {
   'type-1280~text-colour': '.body p { color: #6b7280 }',

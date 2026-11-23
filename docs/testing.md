@@ -101,8 +101,8 @@ baseline can see, and `motion-devices.sh` catches that one instead, by name. **A
 colour tint on text is below what pixels see.** The type page has four mutants, each one
 token changed (body text two grey steps lighter, the heading's family, the button colour,
 the lead's size), and the comparer fails unless every one differs from the baseline by
-more than the tolerance (measured 0.37% to 2.06%). One grey step on thin glyphs measures
-0.0000%, under pixelmatch's per-pixel threshold; that change belongs to the parity gate
+more than the tolerance (0.55% to 2.75% in the pinned renderer). One grey step on thin
+glyphs measured 0.0000% in a local Chromium, under pixelmatch's per-pixel threshold; that change belongs to the parity gate
 and `bin/style-diff.mjs`, which compare computed styles. A failed run keeps the diffs and
 the rendered shots in a `.failed-diffs/` folder under `tests/baselines/`, ignored by git; approving a new or
 changed baseline means copying its PNG from `rendered/` in a `baseline: <why>` commit.
