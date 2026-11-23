@@ -41,7 +41,7 @@ done
 need_token "$ref" '(`--resume --visual`)'
 need_token "$cmd" '--resume [--accept-drift] [--visual]'
 need_token "$ref" 'assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/`'
-need_token "$ref" 'deletes any file the agent created'
+need_token "$ref" 'before/.listing'
 need_token "$ref" 'is `group_<slug>`, where `<slug>` is'
 need_token "$ref" 'The three-round cap is per section.'
 need_token "$ref" '`kind: "cpt-teaser"` sections'
@@ -52,6 +52,10 @@ need_token "$ref" 'Without `--visual`, Step 6 prints no `Visual:` line.'
 # in visual-check must fall back to the slug or every inner section is "not measured".
 need_token "$check" '--name=<slug> --fields=ID,url'
 need_token "$check" '`/wp-yolo --visual` runs this file itself'
-need_token "$check" 'Undoing a round also deletes any file the agent created there.'
+need_token "$check" 'find "<theme-dir>/assets/css/src/tailwindcss" -type f | sort > "$out/before/.listing"'
+# The undo paragraph itself deletes the round's new files, by the listing, not by guesswork.
+awk '/^\*\*A round that made it worse is undone\.\*\*/{on=1} on&&/^$/{exit} on' "$check" \
+  | grep >/dev/null -c 'not in that round'"'"'s `before/.listing`' \
+  || fail "$check: the undo step no longer deletes the round's new files by the listing"
 
 echo "PASS: /wp-yolo --visual measures each seeded section, one at a time, before /wp-finalize, never blocking"

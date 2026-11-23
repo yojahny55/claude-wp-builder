@@ -126,14 +126,20 @@ Each round, in this order:
    `utilities/site.css`) — under
    `$out/before/`, keeping each file's path relative to the theme, so two files with the
    same name never overwrite each other. `$out` is the directory of the measurement this
-   round starts from. Undoing a round also deletes any file the agent created there.
+   round starts from. On `tailwind`, also record which files exist before the round:
+
+   ```bash
+   find "<theme-dir>/assets/css/src/tailwindcss" -type f | sort > "$out/before/.listing"
+   ```
 2. Dispatch the agent, as above.
 3. Rebuild (Step 6.5 again on `tailwind`).
 4. Measure again (3), into a new `--out` directory so each round's images stay apart.
 
 **A round that made it worse is undone.** When the new measurement exits 2 or 4, or its worst
 `diffPercent` is higher than the round before, put back the copies from the `before/` of the
-round that made it worse, rebuild on `tailwind`,
+round that made it worse; on `tailwind`, also delete every file under
+`assets/css/src/tailwindcss/` that is not in that round's `before/.listing` (the round created
+it, and only this section's round ran since the listing), then rebuild;
 stop, and report the previous measurement with "last fix round reverted (<why>)". The tables
 above are for the first measurement; after a fix round, exits 2 and 4 mean the round broke
 something.
