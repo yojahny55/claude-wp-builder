@@ -461,6 +461,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-settings <text>` | B | optional | Extend the settings page |
 | `/wp-favicon <image> [--force]` | all | optional | One image → favicon sizes, `favicon.ico`, `site.webmanifest`, WordPress Site Icon |
 | `/wp-maintenance on\|off\|status` | all | optional | Close the site to visitors with a 503, editors keep working, stores included |
+| `/wp-webp upload on\|off\|status` | all | optional | New PNG and JPEG uploads converted to WebP before their sizes are made, above a PSNR floor |
 | `/wp-seed [file]` | B | required for content | Pages, media, fields, menus from the demo |
 | `/wp-finalize` | all | recommended | Pre-delivery checklist |
 | `/wp-demo-verify <path-or-url> [--positions N] [--no-motion]` | all | recommended | Scroll-walk a demo dir or live page, impeccable detector, screenshots per section and viewport, seven-line critique into demo/VERIFY.md |

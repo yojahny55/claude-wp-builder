@@ -24,6 +24,7 @@ it; manual runs are for re-runs/overrides) · **utility** (any time, any path).
 | [`/wp-settings`](#wp-settings) | B | optional | `fields/settings.php` | new settings fields |
 | [`/wp-favicon`](#wp-favicon) | all | optional | one square image | `assets/img/favicon/*`, Site Icon |
 | [`/wp-maintenance`](#wp-maintenance) | all | optional | WP-CLI, theme prefix | `inc/maintenance.php`, one option |
+| [`/wp-webp`](#wp-webp) | all | optional | WP-CLI, `cwebp` on the server | `mu-plugins/webp-on-upload.php` |
 | [`/wp-seed`](#wp-seed) | B | required for content | demo HTML, `.wp-create.json` | WP pages, media, ACF values, menus |
 | [`/wp-finalize`](#wp-finalize) | all | recommended | theme, WP-CLI | report only |
 | [`/wp-demo-verify`](#wp-demo-verify) | all | recommended | URL or file | `.verify/` screenshots, contact sheet, findings |
@@ -349,6 +350,22 @@ Closes the site to visitors and keeps it open to editors. On a theme site it cop
 `Retry-After`, and anonymous REST requests get the same error. A theme copy that no longer
 matches the template is left alone unless `--force`. Stores use the same switch; WooCommerce's
 coming-soon mode is launch state and is reported, never written. Verified with an anonymous `curl`.
+
+### `/wp-webp`
+
+```
+/wp-webp upload on | upload off | upload status [--force]
+```
+
+Installs `templates/webp/webp-on-upload.php` as a must-use plugin. On `wp_handle_upload` and
+`wp_handle_sideload` at priority 5 it encodes a PNG or JPEG with `cwebp` up a quality ladder,
+keeps the first candidate that reaches 40 dB PSNR and is smaller than the original, and swaps
+the upload for it before WordPress makes the sizes, so every size is WebP. When no candidate
+qualifies the original is kept, and so is a JPEG whose EXIF says it is rotated, an image over
+40 megapixels, or one whose encode passes 30 seconds. `s3://` uploads go through a local temporary copy. Without
+`cwebp`, `proc_open` or a WebP-capable image editor it does nothing; `status` names which.
+Existing images are not touched. A copy that no longer matches the template is left alone
+unless `--force`. Verified with a real `wp media import`.
 
 ### `/wp-seed`
 

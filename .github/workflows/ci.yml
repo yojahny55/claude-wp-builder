@@ -64,6 +64,11 @@ jobs:
           node --version
           php --version | head -1
 
+      # cwebp is what templates/webp/webp-on-upload.php encodes with; the checks run the real
+      # binary rather than a stub of it. It is not on the runner image.
+      - name: Install cwebp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends webp && cwebp -version
+
       # docker-nginx-config.sh serves the Docker nginx template from the image the compose
       # file names and never pulls it itself (a check must not reach the network on a
       # developer's machine). The runner has Docker; the image is fetched here, once, so the
@@ -91,7 +96,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh tests/checks/legal-pages-integration.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh tests/checks/legal-pages-integration.sh tests/checks/webp-on-upload-integration.sh'
           bash tests/run.sh -j 4 --exclude "$skip_here"
 
   syntax:
@@ -286,6 +291,11 @@ jobs:
           chmod +x /usr/local/bin/wp
           wp --info --allow-root
 
+      # cwebp is what templates/webp/webp-on-upload.php encodes with; the checks run the real
+      # binary rather than a stub of it. It is not on the runner image.
+      - name: Install cwebp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends webp && cwebp -version
+
       # This job reaches the network on purpose, and it is the only one that does: a
       # WordPress fixture cannot exist without downloading a WordPress. Everything it
       # installs is pinned in the provisioner, and every assertion runs against the local
@@ -316,6 +326,9 @@ jobs:
           echo "::endgroup::"
           echo "::group::legal page drafts"
           bash tests/checks/legal-pages-integration.sh
+          echo "::endgroup::"
+          echo "::group::webp on upload"
+          bash tests/checks/webp-on-upload-integration.sh
           echo "::endgroup::"
 
   browser:
