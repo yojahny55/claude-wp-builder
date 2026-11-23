@@ -232,12 +232,16 @@ still empty under "Content pending", like `/wp-finalize`.
 
 Without `add_theme_support( 'woocommerce' )` WooCommerce squeezes the shop and every product
 into `page.php`, with no gallery zoom, lightbox or slider, in its own purple and olive. This
-step installs two fixed files: `${CLAUDE_PLUGIN_ROOT}/templates/store/store-theme.php` to
+step installs four fixed files: `${CLAUDE_PLUGIN_ROOT}/templates/store/store-theme.php` to
 `<theme>/inc/store-theme.php`, which declares support, replaces WooCommerce's wrapper and
 sidebar (the theme's header already opens `<main id="primary">`) and loads the stylesheet on
 store pages only; and `${CLAUDE_PLUGIN_ROOT}/templates/store/store.css` to
-`<theme>/assets/css/store.css`, WooCommerce in the theme's tokens. **Copy them; do not retype
-or "improve" them.** Every other page of the site renders as before.
+`<theme>/assets/css/store.css`, WooCommerce in the theme's tokens; and the header's cart link,
+`templates/store/store-cart.php` to `<theme>/template-parts/header/store-cart.php` with its
+script `templates/store/store-cart.js` to `<theme>/assets/js/store-cart.js`. **Copy them; do
+not retype or "improve" them.** Every other page of the site renders as before: the cart link
+renders only where `header.php` calls it, which `/wp-header` writes on a `store` or `full`
+store, and renders nothing in catalog mode.
 
 Skip this step, saying the store pages need the theme's own work, unless `.claude/CLAUDE.md`
 records `**Template:** tailwind` — no `.claude/CLAUDE.md`, a theme `/wp-adopt` registered, or a
@@ -255,13 +259,16 @@ project's (the theme's copy keeps its own):
 
 ```bash
 theme="<theme>"; tmp=$(mktemp -d)
-sed -e "s/__prefix__/<prefix>/g" -e "s/__textdomain__/<slug>/g" \
-  "${CLAUDE_PLUGIN_ROOT}/templates/store/store-theme.php" > "$tmp/store-theme.php"
+for f in store-theme.php store-cart.php; do
+  sed -e "s/__prefix__/<prefix>/g" -e "s/__textdomain__/<slug>/g" \
+    "${CLAUDE_PLUGIN_ROOT}/templates/store/$f" > "$tmp/$f"
+done
 head_of() { sed '/====== Section: Store demo ======/,$d' "$1"; }
 st="INSTALLED"
-if grep -q '__prefix__\|__textdomain__' "$tmp/store-theme.php"; then st="UNSUBSTITUTED TOKENS"
-elif ! php -l "$tmp/store-theme.php" >/dev/null; then st="PHP LINT FAILED"; fi
-for pair in "store-theme.php:inc/store-theme.php" "store.css:assets/css/store.css"; do
+if grep -q '__prefix__\|__textdomain__' "$tmp/store-theme.php" "$tmp/store-cart.php"; then st="UNSUBSTITUTED TOKENS"
+elif ! php -l "$tmp/store-theme.php" >/dev/null || ! php -l "$tmp/store-cart.php" >/dev/null; then st="PHP LINT FAILED"; fi
+for pair in "store-theme.php:inc/store-theme.php" "store.css:assets/css/store.css" \
+  "store-cart.php:template-parts/header/store-cart.php" "store-cart.js:assets/js/store-cart.js"; do
   [ "$st" = INSTALLED ] || break
   src="$tmp/${pair%%:*}"; [ -f "$src" ] || src="${CLAUDE_PLUGIN_ROOT}/templates/store/${pair%%:*}"
   dest="$theme/${pair#*:}"

@@ -461,6 +461,12 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   the menu per language, its position in the demo nav and an idempotent re-seed, which belong
   in `/wp-seed`'s menu step, still to come. Under Polylang every language's link goes to
   WooCommerce's single page until the Polylang bridge.
+- **The header cart count follows WooCommerce's announcements, not every change.** It is the
+  server's count, re-read from the Store API when WooCommerce fires `added_to_cart`,
+  `removed_from_cart` or their block twins. A quantity changed in the cart block announces
+  nothing, so the header keeps the old number until the next page; a full-page cache serves
+  every visitor the count of the page it cached. Cart fragments would fix both at the price of
+  an uncached request on every page view, which is why they are off.
 - **The demo's store styling reaches only what the selector reference names.** `/wp-yolo`'s
   store layer translates a demo's store pages onto WooCommerce's own markup through
   `skills/wp-woocommerce/references/store-selectors.md`; an element with no row there is

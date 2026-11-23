@@ -7,6 +7,8 @@
 #   - after install, shop and product pages use WooCommerce's templates inside one <main> and
 #     one id="primary", with the gallery scripts and no sidebar fallback notice;
 #   - the stylesheet is linked on shop, product, cart and my account, and on no other page.
+#   - the header cart link (store-cart.php): on every page, the count the server knows, the
+#     Store API its script reads answering without a nonce, nothing in catalog mode;
 #   - every selector skills/wp-woocommerce/references/store-selectors.md probes exists here:
 #     in the served page, or in WooCommerce's block scripts for what renders client-side.
 #
@@ -54,6 +56,7 @@ PHP
 cat > "$T/header.php" <<'PHP'
 <!doctype html><html <?php language_attributes(); ?>><head><meta charset="utf-8"><?php wp_head(); ?></head>
 <body <?php body_class(); ?>><?php wp_body_open(); ?>
+<header><?php get_template_part( 'template-parts/header/store-cart', null, array( 'link_class' => 'fx-cart' ) ); ?></header>
 <main id="primary" class="site-main">
 PHP
 printf '</main>\n<?php wp_footer(); ?></body></html>\n' > "$T/footer.php"
@@ -62,7 +65,8 @@ cat > "$T/index.php" <<'PHP'
 PHP
 $WP theme activate fx-theme >/dev/null 2>&1 || fail "could not activate the test theme"
 $WP rewrite structure '/%postname%/' --hard >/dev/null 2>&1 || fail "could not set pretty permalinks"
-$WP eval-file tests/fixtures/wp/woo-product.php >/dev/null 2>&1 || fail "no fixture product"
+PID=$($WP eval-file tests/fixtures/wp/woo-product.php 2>/dev/null | sed -n 's/^PRODUCT_ID=//p')
+[ "${PID:-0}" -gt 0 ] || fail "no fixture product"
 SAMPLE=$($WP eval 'echo (int) wp_insert_post( array( "post_type" => "page", "post_status" => "publish", "post_title" => "Plain page", "post_content" => "Hello" ) );' 2>/dev/null)
 [ "${SAMPLE:-0}" -gt 0 ] || fail "could not create a plain page"
 
@@ -86,11 +90,16 @@ html=$(get product/fixture-mug/)
 has 'Fixture Mug' "$html" || fail "the product page did not render the product"
 has 'class="store-page"' "$html" && fail "control: a .store-page wrapper before anything was installed"
 has 'woocommerce-tabs' "$html" && fail "control: product tabs rendered, so the fixture is not in compatibility mode and proves nothing"
+has 'data-store-cart' "$(get "")" && fail "control: the header renders a cart link before store-cart.php is installed"
 
 # Install, as Step 6.6 does.
 sed -e 's/__prefix__/fx_theme/g' -e 's/__textdomain__/fx-theme/g' templates/store/store-theme.php > "$T/inc/store-theme.php"
 php -l "$T/inc/store-theme.php" >/dev/null || fail "the substituted file does not parse"
 /bin/cp -f templates/store/store.css "$T/assets/css/store.css"
+mkdir -p "$T/template-parts/header" "$T/assets/js"
+sed -e 's/__prefix__/fx_theme/g' -e 's/__textdomain__/fx-theme/g' templates/store/store-cart.php > "$T/template-parts/header/store-cart.php"
+php -l "$T/template-parts/header/store-cart.php" >/dev/null || fail "the substituted store-cart.php does not parse"
+/bin/cp -f templates/store/store-cart.js "$T/assets/js/store-cart.js"
 
 for page in shop/ product/fixture-mug/; do
   html=$(get "$page")
@@ -112,6 +121,26 @@ done
 for page in "" plain-page/ "?s=mug"; do
   has 'fx-theme-store-css' "$(get "$page")" && fail "store.css is linked on a page that is not a store page: /$page"
 done
+
+# The header cart link: on every page, the server's count, the Store API the script reads,
+# and nothing in catalog mode.
+html=$(get "")
+has 'class="store-cart fx-cart"' "$html" || fail "the header renders no cart link on the home page"
+has "href=\"http://127.0.0.1:$PORT/cart/\"" "$html" || fail "the cart link does not point at the cart page"
+has 'aria-label="Cart, 0 items"' "$html" || fail "an empty cart is not labelled 'Cart, 0 items'"
+has 'data-store-cart-count hidden>0<' "$html" || fail "an empty cart's count is not hidden"
+has 'fx-theme-store-cart-js' "$html" || fail "store-cart.js is not enqueued"
+jar="$DIR/cart-cookies.txt"
+curl -s -c "$jar" -b "$jar" -o /dev/null "http://127.0.0.1:$PORT/?add-to-cart=$PID"
+html=$(curl -s -b "$jar" "http://127.0.0.1:$PORT/plain-page/")
+has 'aria-label="Cart, 1 item"' "$html" || fail "after adding one item the header does not say 'Cart, 1 item'"
+has 'data-store-cart-count>1<' "$html" || fail "after adding one item the header count is not 1"
+api=$(curl -s -b "$jar" "http://127.0.0.1:$PORT/wp-json/wc/store/v1/cart")
+python3 -c 'import json,sys; c=json.loads(sys.argv[1]); sys.exit(0 if c.get("items_count") == 1 else 1)' "$api" \
+  || fail "the Store API the script reads does not report the item without a nonce: ${api:0:200}"
+$WP option update store_kit_catalog_mode yes >/dev/null 2>&1 || fail "could not turn catalog mode on"
+has 'data-store-cart' "$(get "")" && fail "catalog mode still renders a cart link"
+$WP option update store_kit_catalog_mode no >/dev/null 2>&1 || fail "could not turn catalog mode off"
 
 # The store layer's selector reference against this WooCommerce: every `html` row's classes
 # are in the page WordPress serves, every `js` row's classes are in WooCommerce's block

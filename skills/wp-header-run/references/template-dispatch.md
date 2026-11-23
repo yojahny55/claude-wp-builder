@@ -31,6 +31,15 @@
 >     `hreflang` on both links and `aria-current="true"` on one, which is
 >     precisely what a working one carries; a measured demo had both. Only where
 >     each link points distinguishes them
+>   - Cart link — only when the dispatch gives a store tier of `store` or `full`. Call the
+>     fixed template part `/wp-woo-setup` installs, never your own cart markup:
+>     `get_template_part( 'template-parts/header/store-cart', null, array( 'link_class' => '…', 'count_class' => '…', 'icon' => '…' ) )`.
+>     Put it where the demo draws its cart, with the demo link's classes in `link_class`,
+>     its count badge's in `count_class` and its inline `<svg>` in `icon`; when the demo
+>     draws none, beside the mobile toggle with no `icon`. **Never inside the menu the
+>     hamburger hides**: on mobile the cart stays one tap away. The part renders nothing
+>     until it is installed and nothing in catalog mode, so the call is safe to write
+>     before the store exists
 >   - Mobile hamburger toggle button with aria attributes
 >   - Skip-to-content link for accessibility
 >   - The `<header>` keeps `id="masthead"`. When the demo header is sticky or fixed, in-page
