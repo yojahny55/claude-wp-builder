@@ -119,35 +119,38 @@ The agent's instructions, in the prompt:
 
 Each round, in this order:
 
-1. **Keep a copy** of every file the agent may edit — `assets/css/styles.css` on `basic`;
-   on `tailwind`, the template part, `assets/css/src/tailwindcss/main.css`, and every file
-   under `assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/` that holds a
-   rule for the section's block (promoted rules live in `components/` and in
-   `utilities/site.css`) — under
-   `$out/before/`, keeping each file's path relative to the theme, so two files with the
-   same name never overwrite each other. `$out` is the directory of the measurement this
-   round starts from. Create it first (`mkdir -p "$out/before"`). On `tailwind`, also record
-   which source files exist before the round, beside `before/`, not inside it:
+1. **Keep a copy** of everything the agent may edit, under `$start/before/`, where `$start`
+   is the directory of the measurement this round starts from (write its path down: step 4
+   measures into a new one):
 
    ```bash
-   src="<theme-dir>/assets/css/src/tailwindcss"   # the same absolute path every round
-   find "$src" -type f | sort > "$out/tailwind-files.txt"
+   start="<this round's starting --out directory>"
+   mkdir -p "$start/before"
    ```
+
+   On `basic`, copy `assets/css/styles.css`. On `tailwind`, copy the template part and the
+   whole Tailwind source tree, so a rule the agent adds to any file, or a file it creates, is
+   undone with the rest:
+
+   ```bash
+   src="<theme-dir>/assets/css/src/tailwindcss"
+   cp -a "$src" "$start/before/tailwindcss"
+   ```
+
+   Keep each copied file's path relative to the theme, so two files with the same name never
+   overwrite each other.
 2. Dispatch the agent, as above.
 3. Rebuild (Step 6.5 again on `tailwind`).
 4. Measure again (3), into a new `--out` directory so each round's images stay apart.
 
 **A round that made it worse is undone.** When the new measurement exits 2 or 4, or its worst
-`diffPercent` is higher than the round before, put back the copies from the `before/` of the
-round that made it worse (only the files copied there); on `tailwind`, also move aside every
-source file that round created — it is not in that round's `tailwind-files.txt`, and only this
-section's round ran since the listing — then rebuild:
+`diffPercent` is higher than the round before, put back the copies from that round's
+`$start/before/`. On `tailwind`, swap the whole source tree back, keeping the undone one
+beside the copy, then rebuild:
 
 ```bash
-[ -s "$out/tailwind-files.txt" ] || { echo "no listing: new files left in place"; exit 0; }
-mkdir -p "$out/created"
-comm -13 "$out/tailwind-files.txt" <(find "$src" -type f | sort) \
-  | while IFS= read -r f; do mv "$f" "$out/created/"; echo "moved aside: $f"; done
+rm -rf "$start/undone-tailwindcss"
+mv "$src" "$start/undone-tailwindcss" && cp -a "$start/before/tailwindcss" "$src"
 ```
 
 Then stop, and report the previous measurement with "last fix round reverted (<why>)". The tables

@@ -40,8 +40,7 @@ for m in 'playwright-core, pixelmatch or pngjs is not installed' 'no existing Ch
 done
 need_token "$ref" '(`--resume --visual`)'
 need_token "$cmd" '--resume [--accept-drift] [--visual]'
-need_token "$ref" 'assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/`'
-need_token "$ref" 'visual-check'"'"'s `tailwind-files.txt` listing is what lets an'
+need_token "$ref" 'visual-check copies the whole'
 need_token "$ref" 'is `group_<slug>`, where `<slug>` is'
 need_token "$ref" 'The three-round cap is per section.'
 need_token "$ref" '`kind: "cpt-teaser"` sections'
@@ -52,13 +51,11 @@ need_token "$ref" 'Without `--visual`, Step 6 prints no `Visual:` line.'
 # in visual-check must fall back to the slug or every inner section is "not measured".
 need_token "$check" '--name=<slug> --fields=ID,url'
 need_token "$check" '`/wp-yolo --visual` runs this file itself'
-need_token "$check" 'mkdir -p "$out/before"'
-need_token "$check" 'find "$src" -type f | sort > "$out/tailwind-files.txt"'
-need_token "$check" '[ -s "$out/tailwind-files.txt" ] || {'
-need_token "$check" 'comm -13 "$out/tailwind-files.txt" <(find "$src" -type f | sort)'
-# The undo paragraph itself deletes the round's new files, by the listing, not by guesswork.
-awk '/^\*\*A round that made it worse is undone\.\*\*/{on=1} on&&/^$/{exit} on' "$check" \
-  | grep >/dev/null -c 'not in that round'"'"'s `tailwind-files.txt`' \
-  || fail "$check: the undo step no longer deletes the round's new files by the listing"
+need_token "$check" 'mkdir -p "$start/before"'
+need_token "$check" 'cp -a "$src" "$start/before/tailwindcss"'
+# The undo paragraph swaps the whole tree back, so no rule or new file a round added survives.
+awk '/^\*\*A round that made it worse is undone\.\*\*/{on=1} on&&/^Then stop/{exit} on' "$check" \
+  | grep >/dev/null -c 'mv "$src" "$start/undone-tailwindcss" && cp -a "$start/before/tailwindcss" "$src"' \
+  || fail "$check: the undo step no longer swaps the Tailwind source tree back"
 
 echo "PASS: /wp-yolo --visual measures each seeded section, one at a time, before /wp-finalize, never blocking"

@@ -52,12 +52,9 @@ them inside this run as:
   on `tailwind`.
 - `/wp-section`'s rebuild step: `bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>` on
   `tailwind`.
-- "The section's component CSS" on `tailwind`: every file under
-  `assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/` that holds a rule for
-  the section's block (Step 4.4's promotion writes to `components/` and to
-  `utilities/site.css`), plus `assets/css/src/tailwindcss/main.css`. Copy each one before a
-  round, with the template part. visual-check's `tailwind-files.txt` listing is what lets an
-  undone round move aside a file it created, and nothing else.
+- "The section's component CSS" on `tailwind`: visual-check copies the whole
+  `assets/css/src/tailwindcss/` tree before each round and swaps it back on undo, so the
+  promoted rules in `components/` and `utilities/site.css` are covered.
 
 ## One section at a time
 
