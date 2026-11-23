@@ -132,8 +132,7 @@ A project with no generated block is left alone: no `.claude/CLAUDE.md` is creat
 around it.
 
 The WhatsApp number and its message are not in this block: they belong in the theme's settings
-page, where the client can change them. No starter theme carries those fields, so a recorded
-`whatsapp` channel renders nothing until the theme adds them.
+page, where the client can change them. Step 6.5 installs those fields and what renders them.
 
 ## Step 4: Stripe test keys — never in the chat
 
@@ -173,6 +172,46 @@ changed and applies to a store that already has orders, which otherwise runs rep
 one exception: on a store that has orders, launch state — coming soon, Stripe's
 `enabled`/`testmode`, cash on delivery — is never changed by `force`; change it in WooCommerce
 instead.
+
+## Step 6.5: Enquiry channels in the theme (catalog with `whatsapp` or `form` only)
+
+A catalog sells nothing online, so its product pages need another way to ask. Skip this step
+unless the tier is `catalog` and `store.enquiry` lists `whatsapp` or `form` (`where-to-buy` is
+WooCommerce's External product type and needs nothing here), and skip it on a theme this
+plugin did not scaffold — no `.claude/CLAUDE.md`, or a third-party theme `/wp-adopt`
+registered: say the channel needs the theme's own work.
+
+The PHP is a fixed file, `${CLAUDE_PLUGIN_ROOT}/templates/store/store-enquiry.php`, held to the
+PHP 7.4 floor. **Copy it and substitute the two tokens; do not retype or "improve" it.**
+
+| Token | Replace with |
+|---|---|
+| `__prefix__` | the bare function prefix from `.claude/CLAUDE.md` (no trailing underscore) |
+| `__textdomain__` | the theme slug (the theme's `Text Domain`) |
+
+```bash
+tmp=$(mktemp)
+sed -e "s/__prefix__/<prefix>/g" -e "s/__textdomain__/<slug>/g" \
+  "${CLAUDE_PLUGIN_ROOT}/templates/store/store-enquiry.php" > "$tmp"
+if grep -q '__prefix__\|__textdomain__' "$tmp"; then echo "UNSUBSTITUTED TOKENS"; exit 1; fi
+php -l "$tmp"
+```
+
+`<theme>/inc/store-enquiry.php` absent: copy it in. Identical: leave it. Different: stop and
+show the diff — someone edited it — unless `--force`. Then require it from that theme's
+`functions.php`, unless the theme already loops over `inc/*.php` (never load it twice):
+
+```php
+require_once __DIR__ . '/inc/store-enquiry.php';
+```
+
+It adds three fields to the theme's settings page — WhatsApp number, WhatsApp message (with
+`{product}`), and the Contact Form 7 form ID — and renders the filled ones on each product
+page after the price, only while store-kit's catalog mode is on. **Never fill the number or
+the form ID yourself**: an invented number is one the client ships by mistake. With
+`form` in the channels and Contact Form 7 active, create the enquiry form with the `wp-cf7`
+agent and report its ID as the value the client confirms. Report the channels whose field is
+still empty under "Content pending", like `/wp-finalize`.
 
 ## Step 7: Report
 
