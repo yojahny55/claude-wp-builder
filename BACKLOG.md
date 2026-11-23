@@ -13,15 +13,12 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on November 23, 2026 against `main` at v1.41.0. Every open and partial
-item was checked against what 1.41.0 shipped. Delivered and marked so: the Playwright-based
-visual QA loop (`/wp-yolo --visual` now runs it over a full build) and WooCommerce N01, whose
-remaining pieces shipped together — the store theme and demo layer, cart and store links,
-products seeded from the demo, `/wp-woo-verify`, the store audit, `/wp-woo-launch` and the
-`store-polylang` bridge. Since then, visual regression testing was delivered (colour and
-type baselines with mutants). Still partial: the craft-family item, which waits for the
-next real craft demo. No item
-is open. The full pass against
+**Reconciled** on November 23, 2026 against `main` at v1.42.0. Every open and partial
+item was checked against what 1.42.0 shipped. Delivered and marked so: visual regression
+testing, whose baselines now cover a colour-and-type page with four mutants that must
+each exceed the tolerance. The rest of 1.42.0 is headroom for six commands, test
+stability and a plugin header, none of which opens or closes an item. Still partial: the
+craft-family item, which waits for the next real craft demo. No item is open. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
