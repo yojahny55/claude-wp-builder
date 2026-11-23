@@ -1,7 +1,7 @@
 ---
 description: Full-site builder — convert a complete multi-page HTML demo folder into a WordPress theme in one pass
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "<demo-folder> [--yolo] [--careful] [--force] [--resume [--accept-drift] [--skip <unit>] [--rebuild <unit>]] [--force-adopted]"
+argument-hint: "<demo-folder> [--yolo] [--careful] [--force] [--visual] [--resume [--accept-drift] [--skip <unit>] [--rebuild <unit>]] [--force-adopted]"
 ---
 
 # WP YOLO — Full-Site Demo → WordPress Theme
@@ -57,8 +57,8 @@ Parse `$ARGUMENTS`:
   or if the path is not a directory:
   ```
   Error: A demo folder is required.
-  Usage: /wp-yolo <path-to-demo-folder> [--yolo] [--careful] [--force]
-         /wp-yolo <path-to-demo-folder> --resume [--accept-drift]
+  Usage: /wp-yolo <path-to-demo-folder> [--yolo] [--careful] [--force] [--visual]
+         /wp-yolo <path-to-demo-folder> --resume [--accept-drift] [--visual]
   ```
 - **`--yolo`** = no checkpoint at all (ingest → build → seed → finalize → report, hands-off).
 - **`--careful`** = checkpoint after normalization AND a per-page confirm before each inner
@@ -70,6 +70,10 @@ Parse `$ARGUMENTS`:
   *Step 4.0: Resuming an interrupted run*. Requires `demo/.yolo-progress.json`.
 - **`--accept-drift`** = with `--resume` only, continue even though a build input
   changed since the interrupted run. Never implied by `--force`.
+- **`--visual`** = once the pages are seeded, pixel-compare every built section with its demo
+  section and loop the CSS agent on the difference (Step 5, item 3). Off by default: it adds
+  a browser pass and up to three agent rounds per section over tolerance. Not recorded in
+  the build ledger: pass it again with `--resume` to keep it.
 
 The command is named `/wp-yolo`; that name is NOT the `--yolo` flag. A bare
 `/wp-yolo <folder>` with no flags runs the Step 3 checkpoint and waits for the
@@ -415,6 +419,9 @@ Run, in order:
    1x1 placeholder: `node "${CLAUDE_PLUGIN_ROOT}/bin/theme-screenshot.mjs" <home-url> <theme-dir>`.
    Exit `2` (no browser) or `1` (page failed): list it under Review in Step 6; it does not
    make the run incomplete.
+   **With `--visual` only:** read
+   `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/visual-pass.md` now and follow it. It measures each built section against its demo now that the pages
+   are seeded, before `/wp-finalize`, and never makes the run incomplete.
 4. **`/wp-finalize`** — MANDATORY. Run the command exactly as a user would (read
    `${CLAUDE_PLUGIN_ROOT}/commands/wp-finalize.md` and execute every step in this same
    run). It runs the 3-layer demo-parity gate (Layers 1-3) that signs off delivery;
@@ -503,6 +510,7 @@ CPTs registered:   <name list, with archive/single status and seed count>
 CF7 forms:         <count, if any contact sections were found>
 Media imported:    <count>
 Mandatory pages:   404, search (always built)
+Visual:            <counts, only with --visual — see visual-pass.md>
 Embed/IDX pages:   <slug list — "install & configure <provider>" for each delivery: idx|plugin page>
 
 Review:

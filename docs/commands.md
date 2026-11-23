@@ -133,12 +133,15 @@ runs it at the end when a store profile was chosen.
 ### `/wp-yolo`
 
 ```
-/wp-yolo <demo-folder> [--yolo | --careful]
+/wp-yolo <demo-folder> [--yolo | --careful] [--visual]
 ```
 
 - default: one checkpoint after normalization, then hands-off
 - `--yolo`: no checkpoint
 - `--careful`: checkpoint + confirm before each inner page
+- `--visual`: after seeding, pixel-compare each built section with its demo
+  (`bin/section-diff.mjs`) and loop the CSS agent on the difference, up to three rounds per
+  section; reported, never blocking
 
 Refuses without `.claude/CLAUDE.md`; redirects `Template: cinematic` projects to path C.
 Phases: normalize (`wp-normalize` → `demo/*.html` + `demo/.yolo-manifest.json`) → scope

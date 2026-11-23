@@ -24,7 +24,8 @@ what differs back to the CSS agent, at most three times.
   sees.
 - The section has no content yet (2 below). `--visual` is for a section whose page has been
   seeded (`/wp-seed`, or edited by hand); `/wp-yolo` builds every section before it seeds, so
-  it does not pass the flag.
+  it never passes the flag to `/wp-section`. `/wp-yolo --visual` runs this file itself, once
+  the pages are seeded (its Step 5, item 3).
 
 ## 1. The page that shows the section
 
@@ -38,7 +39,15 @@ what differs back to the CSS agent, at most three times.
     --meta_value=<target> --fields=ID,url --posts_per_page=1
   ```
 
-  No page: skip, and say "visual: not measured (no published page uses <target>)". Never
+  WordPress also applies `page-<slug>.php` to the page whose slug is `<slug>` without any
+  `_wp_page_template` meta, which is how `/wp-seed` pages get their template. So when that
+  query returns nothing and the target is `page-<slug>.php`, ask for the page by slug:
+
+  ```bash
+  $WP post list --post_type=page --post_status=publish --name=<slug> --fields=ID,url --posts_per_page=1
+  ```
+
+  No page either way: skip, and say "visual: not measured (no published page uses <target>)". Never
   create a page to measure.
 
 ## 2. Is the section seeded?
@@ -110,19 +119,57 @@ The agent's instructions, in the prompt:
 
 Each round, in this order:
 
-1. **Keep a copy** of every file the agent may edit — `assets/css/styles.css` on `basic`;
-   the template part and the section's component CSS on `tailwind` — under
-   `$out/before/`, keeping each file's path relative to the theme, so two files with the
-   same name never overwrite each other. `$out` is the directory of the measurement this
-   round starts from.
+1. **Keep a copy** of everything the agent may edit, under `$start/before/`, where `$start`
+   is the directory of the measurement this round starts from (write its path down: step 4
+   measures into a new one):
+
+   ```bash
+   start="<this round's starting --out directory>"
+   mkdir -p "$start/before"
+   ```
+
+   On `basic`, copy `assets/css/styles.css`. On `tailwind`, copy the template part and the
+   whole Tailwind source tree, so a rule the agent adds to any file, or a file it creates, is
+   undone with the rest:
+
+   ```bash
+   start="<this round's starting --out directory>"
+   theme="<theme-dir>"; part="<the section's template part, relative to the theme>"
+   src="$theme/assets/css/src/tailwindcss"
+   mkdir -p "$start/before/$(dirname "$part")"
+   cp -a "$theme/$part" "$start/before/$part"
+   cp -a "$src" "$start/before/tailwindcss"
+   ```
+
+   Keep each copied file's path relative to the theme, so two files with the same name never
+   overwrite each other.
 2. Dispatch the agent, as above.
 3. Rebuild (Step 6.5 again on `tailwind`).
 4. Measure again (3), into a new `--out` directory so each round's images stay apart.
 
 **A round that made it worse is undone.** When the new measurement exits 2 or 4, or its worst
-`diffPercent` is higher than the round before, put back the copies from the `before/` of the
-round that made it worse, rebuild on `tailwind`,
-stop, and report the previous measurement with "last fix round reverted (<why>)". The tables
+`diffPercent` is higher than the round before, put back the copies from that round's
+`$start/before/`. On `tailwind`, put back the template part and swap the whole source tree
+back, keeping the undone one beside the copy, then rebuild. The block sets its own paths
+(shell state does not carry between calls) and touches nothing when the copy is missing:
+
+```bash
+start="<that round's starting --out directory>"
+theme="<theme-dir>"; part="<the section's template part, relative to the theme>"
+src="$theme/assets/css/src/tailwindcss"
+: "${start:?}" "${theme:?}" "${part:?}"
+[ -d "$start/before/tailwindcss" ] && [ -f "$start/before/$part" ] && [ -d "$src" ] \
+  || { echo "no copy in $start/before, or no $src: round NOT undone"; exit 1; }
+rm -rf "$start/undone-tailwindcss"
+mv "$src" "$start/undone-tailwindcss" && cp -a "$start/before/tailwindcss" "$src" \
+  || { echo "Tailwind tree not swapped back: round NOT undone"; exit 1; }
+cp -a "$start/before/$part" "$theme/$part" \
+  || { echo "template part not restored: round NOT undone"; exit 1; }
+```
+
+A `round NOT undone` is reported as such, never as "reverted".
+
+Then stop, and report the previous measurement with "last fix round reverted (<why>)". The tables
 above are for the first measurement; after a fix round, exits 2 and 4 mean the round broke
 something.
 
