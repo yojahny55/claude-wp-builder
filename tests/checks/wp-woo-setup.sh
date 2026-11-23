@@ -52,8 +52,8 @@ done
 if grep -Fq "they live in the theme's settings" "$cmd"; then fail "$cmd still puts the WhatsApp number in a settings page no starter has"; fi
 grep -Fq 'installs `templates/store/store-enquiry.php` into the theme for the WhatsApp button and the enquiry form' "$skill" \
   || fail "$skill does not say where the catalog's enquiry form and WhatsApp button come from"
-grep -Fq 'no bridge between WooCommerce and Polylang' "$skill" \
-  || fail "$skill does not say products stay untranslated"
+grep -Fq 'The bundled `store-polylang` plugin is the bridge' "$skill" \
+  || fail "$skill does not name the store-polylang bridge"
 
 # The skill's own rules. No check read SKILL.md, so any of these could go with CI green: each
 # is a store default that costs money or orders when an agent gets it wrong.

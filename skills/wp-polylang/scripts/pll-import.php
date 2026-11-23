@@ -229,6 +229,9 @@ $term_counterparts  = array();
 $term_hashes        = array();
 $term_parents_unresolved = array();
 $acf_copied = 0;
+// source_id => target_id of WooCommerce products created this run: they get their shared
+// data (price, SKU, stock, categories) in the product pass below, after the terms exist.
+$new_products = array();
 
 foreach ( $manifest['items'] as $item ) {
 	if ( 'post' === $item['kind'] ) {
@@ -306,7 +309,8 @@ foreach ( $manifest['items'] as $item ) {
 			'menu_order'   => $source_post->menu_order,
 		);
 
-		if ( ! empty( $item['target_id'] ) && get_post( $item['target_id'] ) ) {
+		$is_new_post = ! ( ! empty( $item['target_id'] ) && get_post( $item['target_id'] ) );
+		if ( ! $is_new_post ) {
 			$postarr['ID'] = (int) $item['target_id'];
 			$target_id     = wp_update_post( wp_slash( $postarr ), true );
 		} else {
@@ -358,6 +362,9 @@ foreach ( $manifest['items'] as $item ) {
 		}
 
 		$post_counterparts[ $source_id ] = $target_id;
+		if ( $is_new_post && 'product' === $source_post->post_type ) {
+			$new_products[ $source_id ] = (int) $target_id;
+		}
 		$post_hashes[ $source_id ]       = $item['hash'];
 		$written++;
 		$written_posts++;
@@ -785,6 +792,30 @@ if ( $hashes_withheld ) {
 	) );
 }
 
+// ── WooCommerce products ────────────────────────────────────────────────────
+//
+// A product is a post plus WooCommerce data that is not text: price, SKU, stock, type,
+// sizes, attributes, gallery. wp_insert_post() above created the translation with none of
+// it, which is a product with no price. The store-polylang bridge copies it, and maps the
+// categories and tags to their counterparts, which exist only after the term passes above.
+// Existing translations are not touched: the bridge keeps their shared data in sync.
+$products_copied = 0;
+foreach ( $new_products as $source_id => $target_id ) {
+	if ( ! function_exists( 'store_pll_copy_product' ) ) {
+		pllx_warn( "product $target_id has no price, SKU or stock: delete this translation, activate the store-polylang plugin (/wp-woo-setup installs it on a Polylang site), and translate the product again." );
+		continue;
+	}
+	$res = store_pll_copy_product( $source_id, $target_id, $target );
+	if ( empty( $res['copied'] ) ) {
+		pllx_warn( "product $target_id: its shared data could not be copied from product $source_id." );
+		continue;
+	}
+	if ( $res['terms_missing'] ) {
+		pllx_warn( sprintf( 'product %d: %d categor(ies)/tag(s) have no %s counterpart yet and were left off; translate them, then edit the product.', $target_id, $res['terms_missing'], $target ) );
+	}
+	$products_copied++;
+}
+
 // ── Internal link rewrite pass ──────────────────────────────────────────────
 //
 // A source post's content, or an ACF reference field, may point at another
@@ -910,6 +941,9 @@ pllx_info( sprintf(
 pllx_info( sprintf( 'Fixed %d parent-child relationship(s).', $parents_fixed ) );
 pllx_info( sprintf( 'Fixed %d term parent relationship(s).', $term_parents_fixed ) );
 pllx_info( sprintf( 'Copied %d untranslated ACF value(s) to new counterparts.', $acf_copied ) );
+if ( $new_products ) {
+	pllx_info( sprintf( 'Gave %d new product translation(s) their price, SKU, stock and categories.', $products_copied ) );
+}
 
 // pllx_acf_write() and its resolver (pllx_acf_set(), pllx_acf_descend(),
 // pllx_acf_layout_subs()) all live in pll-lib.php. The resolver is pure and is

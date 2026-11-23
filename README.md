@@ -610,7 +610,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `geo-scan.sh` | Live is-agentic report for `--geo`; `--start` scans a host that has no report yet |
 | `wp-cinematic-encode.sh` | ffmpeg wrapper behind `/wp-cinematic-encode` |
 | `doc-sync-check.sh` | Fails when a command lacks a row here or in `docs/commands.md`, when a skill or agent lacks a row here, or when `commands/`, `agents/`, `skills/`, `starter-theme/` or `bin/` changed without a CHANGELOG entry |
-| `store-kit-sync.sh` | Copies the bundled `plugins/store-kit` into a site when it has none or an older one; never downgrades |
+| `store-kit-sync.sh` | Copies the bundled `plugins/store-kit` (or `plugins/store-polylang`, the Polylang and WooCommerce bridge) into a site when it has none or an older one; never downgrades |
 | `design-md-index.sh` · `domains-import.sh` | Rebuild vendored reference indexes |
 
 `bin/lib/` holds what they share.
@@ -792,7 +792,7 @@ See [BACKLOG.md](BACKLOG.md) for the full product backlog. Key areas of active d
 
 - **WooCommerce stores, after the foundation** — theme integration (the enquiry form and
   WhatsApp button render in the theme), store demo pages, product seeding and a store verify step,
-  a store audit and launch step, the Polylang bridge, then subscriptions and bookings
+  a store audit, launch step and Polylang bridge, then subscriptions and bookings
 - Visual regression between a demo and the theme built from it — screenshot baselines exist today for the motion fixtures only
 - An end-to-end run of a generated site in CI, and a corpus of broken sites with expected audit findings
 - JavaScript specialist agent for sliders, animations, and interactivity

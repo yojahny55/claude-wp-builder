@@ -459,12 +459,13 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   (`--store-pages`, passed by `/wp-yolo`) points nav items and ACF link fields at WooCommerce's
   own pages. A link inside free text (a WYSIWYG paragraph) keeps its demo `href`, a link to a
   single product page has no WooCommerce page to point at, and a catalog store drops its cart
-  and checkout links; each is listed under Review. Under Polylang every language's link goes
-  to WooCommerce's single page until the Polylang bridge.
+  and checkout links; each is listed under Review. Under Polylang, `/wp-polylang`'s import
+  re-points each language's menu items to the translated pages, and `store-polylang` resolves
+  WooCommerce's page IDs to the current language.
 - **Seeded products are simple or External, in one language.** `/wp-seed --products` builds no
   variations: a product with options (size, colour) is created as a draft and listed under
-  Review, for a person to build them in WooCommerce. Products stay untranslated until the
-  Polylang bridge. The script reads the products file and its images from the host, so it needs
+  Review, for a person to build them in WooCommerce. Under Polylang, `/wp-polylang` translates
+  them through `store-polylang`. The script reads the products file and its images from the host, so it needs
   a `native` engine, like `/wp-woo-setup`. A client product is recognised by its sku or its
   exact name; one renamed and without a sku reads as new, and is created beside it.
 - **The header cart count follows WooCommerce's announcements, not every change.** It is the
@@ -530,3 +531,21 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   SEC-039 still measures every one of them live.
 - **`store-kit` is linted at PHP 7.4 and executed on the fixture's PHP.** Syntax on the floor is
   proven; behaviour on 7.4 itself is not.
+- **`store-polylang` bridges products, not every store surface.**
+  - Setup never turns on product translation on a store that already has products: each product
+    would vanish from the other languages until translated. It reports `degraded` with the
+    steps to take.
+  - A variation without a SKU has no counterpart, so it has no shared stock.
+  - Admin emails go out in the site language; customer emails use the order's language.
+  - A site installed in a subfolder does not get the shop-archive redirect.
+  - A block-checkout order takes its language from Polylang's `pll_language` cookie, because
+    the Store API has no Polylang language. With the cookie off, the order records none and its
+    emails use the site language.
+  - Only products and their categories and tags are translated posts. Attribute terms are
+    shared, and their labels are translated as strings. Brands (`product_brand`) are kept out of
+    Polylang on purpose.
+  - `/wp-polylang`'s import copies store data only into the product translations it creates;
+    existing translations are left to the bridge's sync.
+  - It stands down when another bridge runs (the paid Polylang for WooCommerce, or a plugin
+    that names polylang and woocommerce in `Requires Plugins`), because two bridges take every
+    sale twice from stock.

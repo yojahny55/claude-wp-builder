@@ -70,8 +70,12 @@ Measured on WooCommerce 11.1.2 unless marked (source).
   Refund policy — no Terms page.
 - **Polylang gives WooCommerce's pages no language** when it was configured after they were
   created, and `product` is not a translated post type by default. Setup assigns the default
-  language to the store pages. Products stay untranslated: this plugin has
-  no bridge between WooCommerce and Polylang.
+  language to the store pages. The bundled `store-polylang` plugin is the bridge: one product
+  post per language with price, SKU and meta synced, one shared stock, WooCommerce's pages and
+  cart resolved to the current language, the order language recorded for the customer's
+  emails. Setup installs it only when Polylang is active, and it stands down when another
+  bridge runs (the paid Polylang for WooCommerce); two would take every sale twice from stock.
+  Product translation is turned on only on a store with no products yet.
 - **Card testing.** Both Store API limiters are off by default, and card-testing scripts post to
   `/wc/store/v1/checkout` directly even on a classic-checkout store. Setup turns on the
   **checkout limit** (`woocommerce_feature_rate_limit_checkout_enabled`): 3 attempts a minute

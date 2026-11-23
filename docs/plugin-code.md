@@ -85,6 +85,10 @@ load-bearing gates rather than helpers:
   `/wp-woo-setup` through `bin/store-kit-sync.sh`: catalog mode, and Stripe keys read from
   `wp-config.php` instead of the database. Held to the PHP 7.4 floor, and exercised against a
   real WooCommerce in the fixture.
+- `plugins/store-polylang/` — the Polylang (free) and WooCommerce bridge, copied the same way
+  (`bin/store-kit-sync.sh <plugins-dir> store-polylang`) when Polylang is active: product
+  translations with shared data and stock, store pages and cart per language, the order
+  language. Same PHP 7.4 floor; unit tests in `tests/store-polylang/`, integration in the fixture.
 - `starter-theme/**` — PHP copied into user projects (never executed here).
 - `templates/agentic/agentic.php` — the theme's `inc/agentic.php`, copied whole by the
   `wp-agentic-surfaces` agent with its tokens substituted (never executed here).

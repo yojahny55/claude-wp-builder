@@ -265,7 +265,7 @@ Server setup, permissions, and WordPress configuration.
 - [x] **`impeccable` follows its latest release** `DELIVERED`
   Every call is `npx -y impeccable@latest`, and [composition-gate](bin/composition-gate.sh) exits 1 on detector output it does not understand instead of passing it. [wp-craft-composition-gate](tests/checks/wp-craft-composition-gate.sh) and [wp-craft-detect](tests/checks/wp-craft-detect.sh) guard it and fail on any numeric `impeccable@` pin.
 
-- [ ] **WooCommerce stores (N01)** `PARTIAL`
+- [x] **WooCommerce stores (N01)** `DELIVERED`
   Piece 1 of 8, the foundation, is delivered: three store profiles, the `store` block,
   [`/wp-woo-setup`](commands/wp-woo-setup.md) with its [setup script](skills/wp-woocommerce/scripts/woo-setup.php),
   and [`store-kit`](plugins/store-kit/store-kit.php), proven by
@@ -311,9 +311,18 @@ Server setup, permissions, and WordPress configuration.
   — policy pages, email sender, shipping at the store's address, tax rates, product data, failed
   scheduled actions, order-table sync, and the launch state, `CRITICAL` on production
   ([check](tests/checks/store-audit.sh), [on a real store](tests/checks/store-audit-integration.sh)).
-  Not started: the launch step (`/wp-woo-launch`, designed), then the Polylang bridge.
+  Its second half too: [`/wp-woo-launch`](commands/wp-woo-launch.md) takes a store live on
+  purpose and back to coming soon ([check](tests/checks/wp-woo-launch.sh)). Piece 5 is delivered.
+  The Polylang bridge is delivered: [`store-polylang`](plugins/store-polylang/store-polylang.php)
+  syncs product translations and one shared stock, resolves WooCommerce's pages and cart per
+  language and records the order language; setup installs it and turns on product translation
+  on an empty store, and [the import](skills/wp-polylang/scripts/pll-import.php) maps a
+  product translation's data ([check](tests/checks/store-polylang.sh),
+  [on a real store](tests/checks/store-polylang-integration.sh)); its limits are in the
+  [known ceilings](docs/known-ceilings.md).
   Subscriptions and bookings are closed as a [known ceiling](docs/known-ceilings.md): the free
   plugin is rejected and the official extensions are paid, with no licence to test them.
+  All eight pieces are delivered or closed as a ceiling.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`
   [The integration check](tests/checks/wp-woo-setup-integration.sh) failed once at "setup
