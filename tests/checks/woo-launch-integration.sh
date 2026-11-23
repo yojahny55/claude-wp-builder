@@ -84,7 +84,21 @@ has() { grep -F -- "$1" "$OUT" >/dev/null || fail "$2: no \"$1\" in: $(tr '\n' '
 opt() { q "echo get_option( '$1' );"; }
 sub() { q "\$o = get_option( '$1' ); echo is_array( \$o ) && isset( \$o['$2'] ) ? \$o['$2'] : '';"; }
 launched() { python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1]))["store"].get("launch")))' "$PROJ/.wp-create.json"; }
-snapshot() { q 'global $wpdb; echo md5( serialize( $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name NOT LIKE \"\\_transient%\" AND option_name NOT LIKE \"\\_site\\_transient%\" AND option_name NOT LIKE \"%session%\" ORDER BY option_name" ) ) );'; }
+# One line per option, name and a hash of its value: a mismatch names what changed. WordPress
+# writes some options on its own while the fixture serves requests, whatever this check runs:
+# WP-Cron reschedules events in `cron` after any front-end request, and Action Scheduler (run
+# by that cron) keeps its locks in `action_scheduler_lock_*`. Those are the scheduler's
+# bookkeeping, not the store, and counting them made the wrong-host assertion fail now and
+# then in CI with no change to the launch. Any other changed option still fails.
+snapshot() { q 'global $wpdb; foreach ( $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name NOT LIKE \"\\_transient%\" AND option_name NOT LIKE \"\\_site\\_transient%\" AND option_name NOT LIKE \"%session%\" AND option_name <> \"cron\" AND option_name NOT LIKE \"action\\_scheduler\\_lock\\_%\" ORDER BY option_name" ) as $r ) { echo $r->option_name, " ", md5( $r->option_value ), "\n"; }'; }
+# Fails naming the options that differ from the snapshot in $1.
+unchanged() {
+  local now changed
+  now=$(snapshot)
+  [ "$now" = "$1" ] && return 0
+  changed=$(diff <(printf '%s\n' "$1") <(printf '%s\n' "$now") | sed -n 's/^[<>] \([^ ]*\) .*/\1/p' | sort -u | tr '\n' ' ' || true)
+  fail "$2 (options: ${changed:-none listed})"
+}
 
 # --- A local site is never launched ---------------------------------------------------------------
 code=$(L)
@@ -104,7 +118,7 @@ for f in "fail stripe:secret_key: STORE_KIT_STRIPE_SECRET_KEY is not defined" "f
          "fail stripe:webhook_secret" "fail turnstile:cfturnstile_key: CF_TURNSTILE_SITE_KEY is not defined" "fail audit: STORE-005"; do
   has "$f" "a production store as setup leaves it"
 done
-[ "$(snapshot)" = "$before" ] || fail "a check-only run changed the store's options"
+unchanged "$before" "a check-only run changed the store's options"
 [ -z "$(ls -A "$BACKUPS")" ] || fail "a check-only run took a backup"
 
 $WP config set CF_TURNSTILE_SITE_KEY 1x00000000000000000000AA --type=constant --quiet
@@ -135,7 +149,7 @@ before=$(snapshot)
 code=$(L --confirm "not-$HOST" --backup-out "$BACKUPS")
 [ "$code" = 1 ] || fail "a wrong --confirm exited $code, not 1"
 has "is not this site's host" "a wrong --confirm"
-[ "$(snapshot)" = "$before" ] || fail "a wrong --confirm changed the store"
+unchanged "$before" "a wrong --confirm changed the store"
 [ -z "$(ls -A "$BACKUPS")" ] || fail "a wrong --confirm took a backup"
 
 # --- The launch -------------------------------------------------------------------------------------
