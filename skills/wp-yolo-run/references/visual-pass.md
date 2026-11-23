@@ -43,13 +43,14 @@ section is built with. Its "When it does not run" list applies, except the `--vi
 - Home page sections target `front-page.php`: the page `page_on_front` names.
 - Inner page sections target `page-<slug>.php`: the page `/wp-seed` created at that slug,
   which visual-check section 1 finds by slug.
-visual-check.md names `/wp-section`'s own steps. Read them inside this run as:
+visual-check.md cites `/wp-section`'s own step numbers, which mean other things here. Read
+them inside this run as:
 
-- "Step 5's naming convention": the section's field group is `group_<slug>`, where `<slug>` is
+- `/wp-section`'s field naming: the section's field group is `group_<slug>`, where `<slug>` is
   the section name Step 4 passed to `/wp-section`, slugified, with hyphens as underscores.
-- "The routing in Step 5": the CSS agent Step 4 routed to, `wp-css` on `basic`, `wp-tailwind`
+- `/wp-section`'s CSS routing: the CSS agent Step 4 routed to, `wp-css` on `basic`, `wp-tailwind`
   on `tailwind`.
-- "Step 6.5" (rebuild): `bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>` on
+- `/wp-section`'s rebuild step: `bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>` on
   `tailwind`.
 - "The section's component CSS" on `tailwind`: every file under
   `assets/css/src/tailwindcss/components/` that holds a rule for the section's block, which is
