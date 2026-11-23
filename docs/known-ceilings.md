@@ -537,7 +537,6 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
     steps to take.
   - A variation without a SKU has no counterpart, so it has no shared stock.
   - Admin emails go out in the site language; customer emails use the order's language.
-  - A site installed in a subfolder does not get the shop-archive redirect.
   - A block-checkout order takes its language from Polylang's `pll_language` cookie, because
     the Store API has no Polylang language. With the cookie off, the order records none and its
     emails use the site language.

@@ -127,10 +127,38 @@ function store_pll_redirect_untranslated_shop() {
 	if ( empty( $paths[ $lang ] ) ) {
 		return;
 	}
-	$request = trim( (string) wp_parse_url( add_query_arg( array() ), PHP_URL_PATH ), '/' );
-	if ( $request !== $paths[ $lang ] ) {
+	$home = (string) wp_parse_url( get_option( 'home' ), PHP_URL_PATH ); // Raw option, as in store_pll_shop_paths().
+	if ( ! store_pll_is_shop_request( (string) wp_parse_url( add_query_arg( array() ), PHP_URL_PATH ), $home, $paths[ $lang ] ) ) {
 		// add_query_arg() does not encode values: `?s=a%26b` came out as `?s=a&b`.
 		wp_safe_redirect( add_query_arg( urlencode_deep( wp_unslash( $_GET ) ), get_post_type_archive_link( 'product' ) ), 301 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		exit;
 	}
+}
+
+/**
+ * True when a request path is the language's shop path.
+ *
+ * The shop path is relative to the site home, the request path is not: under a site in a
+ * subfolder (`/site/`) the request carries it, and without stripping it the two never match
+ * and the redirect above sends the shop to itself forever. Both sides are decoded and
+ * lowercased, because WordPress stores a non-ASCII slug percent-encoded in lowercase and a
+ * browser sends it in uppercase.
+ *
+ * @param string $request_path Path of the request, e.g. `/site/en/<slug>/`.
+ * @param string $home_path    Path of the site home, e.g. `/site/` or ''.
+ * @param string $shop_path    store_pll_shop_paths() entry, e.g. `en/<slug>`.
+ */
+function store_pll_is_shop_request( $request_path, $home_path, $shop_path ) {
+	$norm    = function ( $path ) {
+		return strtolower( rawurldecode( trim( (string) $path, '/' ) ) );
+	};
+	$request = $norm( $request_path );
+	$home    = $norm( $home_path );
+	if ( '' !== $home ) {
+		if ( $request !== $home && 0 !== strpos( $request, $home . '/' ) ) {
+			return false;
+		}
+		$request = ltrim( substr( $request, strlen( $home ) ), '/' );
+	}
+	return $request === $norm( $shop_path );
 }

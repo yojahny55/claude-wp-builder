@@ -30,3 +30,12 @@ wpll_same(
 	'archive and pagination rules'
 );
 wpll_same( array( 'a\.b/?$', 'a\.b/page/([0-9]{1,})/?$' ), array_keys( store_pll_shop_rules( array( 'en' => 'a.b' ) ) ), 'the slug is escaped for regex' );
+
+// The redirect compares the request with the shop path: a subfolder install and a non-ASCII
+// slug must both match, or the shop redirects to itself forever.
+wpll_same( true, store_pll_is_shop_request( '/en/shop/', '', 'en/shop' ), 'root install: the shop path matches' );
+wpll_same( true, store_pll_is_shop_request( '/site/en/shop/', '/site/', 'en/shop' ), 'subfolder install: the home path is stripped' );
+wpll_same( false, store_pll_is_shop_request( '/site/en/other/', '/site/', 'en/shop' ), 'subfolder install: another page does not match' );
+wpll_same( false, store_pll_is_shop_request( '/sitex/en/shop/', '/site/', 'en/shop' ), 'a path that only starts like the home is not under it' );
+wpll_same( true, store_pll_is_shop_request( '/ru/%D0%BC%D0%B0%D0%B3/', '', 'ru/%d0%bc%d0%b0%d0%b3' ), 'percent-encoding case does not matter' );
+wpll_same( false, store_pll_is_shop_request( '/shop/', '', 'en/shop' ), 'the default-language path is not the translated one' );
