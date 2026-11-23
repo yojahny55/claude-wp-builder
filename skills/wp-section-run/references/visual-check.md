@@ -126,10 +126,12 @@ Each round, in this order:
    `utilities/site.css`) — under
    `$out/before/`, keeping each file's path relative to the theme, so two files with the
    same name never overwrite each other. `$out` is the directory of the measurement this
-   round starts from. On `tailwind`, also record which files exist before the round:
+   round starts from. Create it first (`mkdir -p "$out/before"`). On `tailwind`, also record
+   which source files exist before the round, beside `before/`, not inside it:
 
    ```bash
-   find "<theme-dir>/assets/css/src/tailwindcss" -type f | sort > "$out/before/.listing"
+   src="<theme-dir>/assets/css/src/tailwindcss"   # the same absolute path every round
+   find "$src" -type f | sort > "$out/tailwind-files.txt"
    ```
 2. Dispatch the agent, as above.
 3. Rebuild (Step 6.5 again on `tailwind`).
@@ -137,10 +139,18 @@ Each round, in this order:
 
 **A round that made it worse is undone.** When the new measurement exits 2 or 4, or its worst
 `diffPercent` is higher than the round before, put back the copies from the `before/` of the
-round that made it worse; on `tailwind`, also delete every file under
-`assets/css/src/tailwindcss/` that is not in that round's `before/.listing` (the round created
-it, and only this section's round ran since the listing), then rebuild;
-stop, and report the previous measurement with "last fix round reverted (<why>)". The tables
+round that made it worse (only the files copied there); on `tailwind`, also move aside every
+source file that round created — it is not in that round's `tailwind-files.txt`, and only this
+section's round ran since the listing — then rebuild:
+
+```bash
+[ -s "$out/tailwind-files.txt" ] || { echo "no listing: new files left in place"; exit 0; }
+mkdir -p "$out/created"
+comm -13 "$out/tailwind-files.txt" <(find "$src" -type f | sort) \
+  | while IFS= read -r f; do mv "$f" "$out/created/"; echo "moved aside: $f"; done
+```
+
+Then stop, and report the previous measurement with "last fix round reverted (<why>)". The tables
 above are for the first measurement; after a fix round, exits 2 and 4 mean the round broke
 something.
 

@@ -56,8 +56,8 @@ them inside this run as:
   `assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/` that holds a rule for
   the section's block (Step 4.4's promotion writes to `components/` and to
   `utilities/site.css`), plus `assets/css/src/tailwindcss/main.css`. Copy each one before a
-  round, with the template part. visual-check's `before/.listing` is what lets an undone
-  round delete a file it created, and nothing else.
+  round, with the template part. visual-check's `tailwind-files.txt` listing is what lets an
+  undone round move aside a file it created, and nothing else.
 
 ## One section at a time
 
