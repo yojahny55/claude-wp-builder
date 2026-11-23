@@ -35,15 +35,17 @@ what differs back to the CSS agent, at most three times.
 
 ## 2. Is the section seeded?
 
-The section's fields are named `<slug>_<element>` (Step 5's naming convention). Count the
-ones with a value on that page:
+Ask the section's own field group, `group_<slug>` (Step 5's naming convention, hyphens as
+underscores), how many of its fields hold content on that page. `wp eval` takes no arguments,
+so the question is a script run with `eval-file`:
 
 ```bash
-$WP eval 'global $wpdb; echo (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key LIKE %s AND meta_value <> %s", (int) $args[0], $wpdb->esc_like( $args[1] . "_" ) . "%", "" ) );' <page-id> <slug-with-underscores>
+$WP eval-file "${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/scripts/section-seeded.php" <page-id> <slug_with_underscores>
 ```
 
 `0`: skip, and say "visual: not measured (content not seeded yet; run /wp-seed, then
-/wp-section <slug> --visual)". An empty repeater or a missing image would only measure the
+/wp-section <slug> --visual)". `-1` (no ACF/SCF, or no such field group): skip, and say
+"visual: not measured (no field group group_<slug>)". An empty repeater or a missing image would only measure the
 absent content, and the CSS agent would "fix" it with values that are not the demo's.
 
 ## 3. Measure
@@ -98,13 +100,20 @@ The agent's instructions, in the prompt:
   a missing image or font, or a script-driven state is returned as `not CSS: <reason>` with
   nothing edited.
 
-**Before each round, keep a copy** of every file the agent may edit — `assets/css/styles.css`
-on `basic`; the template part and the section's component CSS on `tailwind` — in
-`$out/before/`. Then rebuild (Step 6.5 again on `tailwind`) and measure again (3), with a new
-`--out` directory so each round's images stay apart.
+Each round, in this order:
+
+1. **Keep a copy** of every file the agent may edit — `assets/css/styles.css` on `basic`;
+   the template part and the section's component CSS on `tailwind` — under
+   `$out/before/`, keeping each file's path relative to the theme, so two files with the
+   same name never overwrite each other. `$out` is the directory of the measurement this
+   round starts from.
+2. Dispatch the agent, as above.
+3. Rebuild (Step 6.5 again on `tailwind`).
+4. Measure again (3), into a new `--out` directory so each round's images stay apart.
 
 **A round that made it worse is undone.** When the new measurement exits 2 or 4, or its worst
-`diffPercent` is higher than the round before, put the copies back, rebuild on `tailwind`,
+`diffPercent` is higher than the round before, put back the copies from the `before/` of the
+round that made it worse, rebuild on `tailwind`,
 stop, and report the previous measurement with "last fix round reverted (<why>)". The tables
 above are for the first measurement; after a fix round, exits 2 and 4 mean the round broke
 something.

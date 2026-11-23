@@ -36,12 +36,13 @@ need_token "$ref" '**Take the value from the demo, never from the pixels.**'
 need_token "$ref" '`not CSS: <reason>`'
 need_token "$ref" 'three fix rounds done'
 need_token "$ref" 'fell by less than half a point'
-need_token "$ref" 'directory so each round'"'"'s images stay apart'
+need_token "$ref" 'so each round'"'"'s images stay apart'
 need_token "$ref" 'content not seeded yet'
-need_token "$ref" '**Before each round, keep a copy**'
 need_token "$ref" '**A round that made it worse is undone.**'
 need_token "$ref" '**Never rename the section'"'"'s root class or its block.**'
-need_token "$ref" "meta_key LIKE %s"
+need_token "$ref" 'skills/wp-section-run/scripts/section-seeded.php" <page-id>'
+need_token "$ref" '1. **Keep a copy**'
+grep -nE '\$WP eval [^-].*\$args' "$ref" >/dev/null && fail "$ref passes arguments to wp eval, which takes none (use eval-file)"
 
 # The ref names the fields and exit codes section-diff really has.
 for f in diffPercent widthDeltaPercent heightDeltaPercent; do
@@ -58,6 +59,38 @@ node -e '
     const got = Object.keys(TOOLS["section-diff.mjs"]).sort();
     if (got.join() !== want.slice().sort().join()) { console.error("section-diff exit codes changed: " + got.join()); process.exit(1); }
   });' || fail "section-diff.mjs exit codes no longer match the table in $ref"
+
+# section-seeded.php, run for real against stubbed ACF: exact group fields, an empty repeater
+# ("0" in meta, an empty array from get_field) is empty, and a group that is not there is -1.
+require_tool php
+seeded=skills/wp-section-run/scripts/section-seeded.php
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+cat >"$tmp/run.php" <<'PHP'
+<?php
+// argv: page id, slug, scenario (empty|filled|nogroup|noacf)
+$args = array( $argv[1], $argv[2] );
+$GLOBALS['scenario'] = $argv[3];
+if ( 'noacf' !== $argv[3] ) {
+	function acf_get_fields( $key ) {
+		if ( 'nogroup' === $GLOBALS['scenario'] || 'group_hero' !== $key ) { return false; }
+		return array( array( 'name' => 'hero_title' ), array( 'name' => 'hero_items' ), array( 'name' => 'hero_image' ) );
+	}
+	function get_field( $name, $page ) {
+		$filled = 'filled' === $GLOBALS['scenario'];
+		$v = array( 'hero_title' => $filled ? 'Welcome' : '', 'hero_items' => $filled ? array( array( 'x' => 1 ) ) : array(), 'hero_image' => $filled ? 12 : false );
+		return $v[ $name ];
+	}
+}
+require getenv( 'SEEDED' );
+PHP
+seed() { SEEDED="$PWD/$seeded" php "$tmp/run.php" "$@"; }
+[ "$(seed 7 hero empty)" = 0 ] || fail "section-seeded counts empty fields or an empty repeater: $(seed 7 hero empty)"
+[ "$(seed 7 hero filled)" = 3 ] || fail "section-seeded does not count filled fields: $(seed 7 hero filled)"
+[ "$(seed 7 hero nogroup)" = -1 ] || fail "section-seeded must print -1 without the field group"
+[ "$(seed 7 hero noacf)" = -1 ] || fail "section-seeded must print -1 without ACF"
+rc=0; seed 7 'hero;drop' empty >/dev/null 2>&1 || rc=$?
+[ "$rc" = 64 ] || fail "section-seeded must refuse a slug outside [a-z0-9_] with exit 64 (got $rc)"
 
 need_token BACKLOG.md 'tests/checks/section-visual-loop.sh'
 echo "PASS: /wp-section --visual measures the section against its demo and loops the CSS agent at most three rounds"
