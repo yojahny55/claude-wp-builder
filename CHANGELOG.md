@@ -2,6 +2,119 @@
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-11-23
+
+### Added
+
+- **Blog posts carry a language under the suffix strategy.** `/wp-page blog` now installs
+  `templates/blog-language/blog-language.php` as `inc/blog-language.php` on suffix projects:
+  a `post_language` select on posts and a filter that lists the visitor's language plus
+  every post with no language on the blog index, post archives and search. Before, a
+  one-page-per-every-language site listed every post in every language. Posts with no
+  language stay listed everywhere, and Polylang projects are untouched.
+
+- **The commands can be exported for Cursor, Gemini CLI and `AGENTS.md` readers.**
+  `bin/export-platform.mjs --target agents-md|cursor|gemini <out-dir>` writes, from the
+  commands as they are, an `AGENTS.md` index, one Cursor rule per command, or Gemini CLI
+  commands with their arguments. Plugin paths are made absolute, and each exported command
+  opens with what another agent lacks: run a subagent's steps yourself, in order, and ask
+  questions in the chat. No command changes.
+
+- **`/wp-page legal` creates the legal pages.** It used to generate the Legal Page template
+  and stop, so a site went to `/wp-finalize` with no Privacy Policy, Terms or Cookie Policy
+  page. It now drafts the three from what the project records, leaving every fact it does not
+  have as `[[pending: …]]`, and `skills/wp-page-run/scripts/legal-pages.php` creates them as
+  drafts on the template. WordPress's own unfilled privacy draft is filled; a page someone
+  already wrote under one of the slugs is never touched; nothing is published.
+
+- **`bin/section-diff.mjs` compares a built section with its demo, pixel by pixel.** The
+  parity gate compared computed styles only. The tool finds the section in the demo by its
+  delimiter and in the built page by the same root class, captures both per viewport with
+  motion settled, compares them with pixelmatch over the shared area, checks the width and
+  height difference on their own, and writes demo, site and diff images. Exit `1` over a
+  tolerance, `2` when nothing could be measured (no browser, a page that fails to load), `4`
+  when the section is missing or its selector ambiguous.
+
+- **`/wp-section --visual` checks a built section against its demo and fixes what differs.**
+  After the CSS is compiled, Step 6.6 runs `bin/section-diff.mjs` on the page that shows the
+  section. A viewport over tolerance goes back to the section's CSS agent with the demo, site
+  and diff images; the agent fixes only that section's rules, with the demo's declared values,
+  and says so when a difference is content rather than CSS. The loop stops after three rounds
+  or when the difference stops shrinking, and the summary reports what remains. Without a
+  local Chrome, or when the section cannot be found, it reports "not measured" and the section
+  is still built.
+
+- **A catalog store's product pages offer its enquiry channels.** A store that sells nothing
+  online recorded `whatsapp` and `form` as enquiry channels, and nothing rendered them.
+  `/wp-woo-setup` Step 6.5 now copies a fixed file into the theme that adds the WhatsApp
+  number, its message and a Contact Form 7 form ID to the theme's settings page, and shows a
+  WhatsApp link and the form on each product page while store-kit's catalog mode is on. Empty
+  fields render nothing, so installing it changes no page until the client fills them; the
+  plugin never fills the number itself.
+
+- **A delivered theme previews as the site, not a blank tile.** The tailwind starter ships a 1x1
+  `screenshot.png`, and nothing replaced it. `bin/theme-screenshot.mjs` captures the built
+  homepage at 1200x900 into the theme; `/wp-yolo` runs it after the CSS rebuild, and
+  `/wp-finalize` Check 4 fails a theme that still carries the placeholder, naming the command.
+  A real preview is kept unless `--force`.
+
+- **`/wp-webp migrate` converts a PNG library already on disk.** The written PNG-to-WebP
+  procedure had no script, so nothing ran it. `skills/wp-robin/scripts/webp-migrate.php` now
+  does, in steps the command drives after a database and uploads backup: `convert` each PNG
+  attachment to a WebP original with WebP sizes and an old-to-new map, `replace` every stored
+  reference (serialized and JSON-escaped values included), `verify` files and database, and
+  `move-aside` the old files to a folder outside uploads only once verify passes. Nothing is
+  deleted.
+
+- **`/wp-webp upload` makes every new upload a WebP.** It installs a must-use plugin that, on
+  `wp_handle_upload` and `wp_handle_sideload` before WordPress makes the sizes, encodes a PNG
+  or JPEG with `cwebp` up a quality ladder and keeps the first candidate that reaches 40 dB
+  PSNR and is smaller than the original, so every size is born WebP and nothing has to be
+  delivered by rewriting. When no candidate qualifies, the JPEG is EXIF-rotated, or the image
+  is over 40 megapixels, the original is kept. `s3://` uploads
+  work through a local copy. Without `cwebp`, `proc_open` or a WebP-capable editor it does
+  nothing, and `status` says why. Existing images are not touched.
+
+- **`/wp-section` ports the section's JavaScript.** A single-section build had no script step,
+  so a carousel or gallery built that way rendered and did nothing. The new `wp-js` agent
+  writes one guarded, no-op-without-markup module per section under
+  `assets/js/src/sections/`, bound to `data-` hooks it adds to the template part, reuses the
+  theme's own tabs, accordion and filter modules, wires the module into `index.js` and
+  rebuilds the bundle. `/wp-section` Step 6.4 dispatches it whenever a demo script touches the
+  section, found with the new `bin/demo-scripts.mjs` (inline script bodies only, never the
+  page markup); a library the theme does not have stops it with the install command, and a
+  stopped port is undone.
+
+- **`/wp-maintenance` closes a site to visitors while editors keep working.** WordPress
+  core's `.maintenance` file locks out administrators too and is meant for the minutes of an
+  update. The command copies a fixed `inc/maintenance.php` into the theme and switches it with
+  one option: visitors who cannot `edit_posts` get a `503` with a `Retry-After` header, and
+  anonymous REST requests, the Store API included, get the same error. While the option is
+  absent the file changes nothing a visitor sees. Stores use the same switch: WooCommerce's
+  coming-soon mode answers `200`, admits only shop managers and leaves the APIs open, so the
+  command reports it and never writes it. Each change is verified with an anonymous request.
+
+### Changed
+
+- **`CLAUDE.md` is half its size.** It is loaded into every session, so its 260 lines
+  were paid on every task. The `bin/` tool catalog moved to `docs/plugin-code.md`, the
+  release steps to `docs/releasing.md` and the craft and store detail to
+  `docs/architecture.md`; `CLAUDE.md` keeps the rules and a pointer to each, and its line
+  budget drops from 260 to 150. The `/wp-contribute` skill review now runs its subagent on
+  sonnet instead of inheriting the session model.
+
+### Fixed
+
+- **Media imports no longer fail on `--post_author`.** `wp media import` has no
+  `--post_author` option and refuses it (`unknown --post_author parameter`), so every import
+  `/wp-seed`, `/wp-favicon`, `/wp-cinematic-seed`, `/wp-cinematic-encode` and the `wp-acf`
+  agent ran with it failed outright. They now pass the global `--user=<admin ID>`, which makes
+  that user the attachment's author; `wp post create` keeps `--post_author`.
+  `bin/wp-cinematic-encode.sh`, which imported with no user at all, now resolves the
+  administrator and passes it the same way.
+  `tests/checks/seed-post-author.sh` requires `--user` on every import and refuses
+  `--post_author` there.
+
 ## [1.39.0] - 2026-11-22
 
 ### Added

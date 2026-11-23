@@ -13,12 +13,14 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 
 **Priority:** Items within each section are ordered by priority (highest first).
 
-**Reconciled** on November 22, 2026 against `main` at v1.39.0. Every open and partial
-item was checked against what 1.39.0 shipped: `/wp-finalize` listing empty contact and social
-settings as content pending, and the audit aggregator reading agent reports in the shapes
-agents write, with the seeded-defects corpus judged against a live `/wp-audit` run. Both
-items were already marked delivered; no other item moved. The craft-family item stays
-partial until the next real craft demo. The full pass against
+**Reconciled** on November 23, 2026 against `main` at v1.40.0. Every open and partial
+item was checked against what 1.40.0 shipped. Delivered and marked so: `/wp-maintenance`, the
+blog language field, legal page drafts, WebP on upload and the WebP migration of an existing
+library, the theme screenshot, and the `wp-js` agent. Moved forward but still partial: the
+visual QA loop (`/wp-section --visual` loops on `section-diff.mjs`; `/wp-yolo` does not pass
+it), WooCommerce N01 (piece 2 of 8, the enquiry channels), and multi-platform support (phase 1,
+the exporter; phase 2 waits for a decision). The craft-family item stays partial until the
+next real craft demo. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
