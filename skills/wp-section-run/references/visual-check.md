@@ -158,11 +158,12 @@ start="<that round's starting --out directory>"
 theme="<theme-dir>"; part="<the section's template part, relative to the theme>"
 src="$theme/assets/css/src/tailwindcss"
 : "${start:?}" "${theme:?}" "${part:?}"
-[ -d "$start/before/tailwindcss" ] && [ -f "$start/before/$part" ] \
-  || { echo "no copy in $start/before: round NOT undone"; exit 1; }
-cp -a "$start/before/$part" "$theme/$part"
+[ -d "$start/before/tailwindcss" ] && [ -f "$start/before/$part" ] && [ -d "$src" ] \
+  || { echo "no copy in $start/before, or no $src: round NOT undone"; exit 1; }
 rm -rf "$start/undone-tailwindcss"
-mv "$src" "$start/undone-tailwindcss" && cp -a "$start/before/tailwindcss" "$src"
+mv "$src" "$start/undone-tailwindcss" && cp -a "$start/before/tailwindcss" "$src" \
+  || { echo "Tailwind tree not swapped back: round NOT undone"; exit 1; }
+cp -a "$start/before/$part" "$theme/$part"
 ```
 
 A `round NOT undone` is reported as such, never as "reverted".
