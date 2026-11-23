@@ -13,17 +13,32 @@
 
 defined( 'ABSPATH' ) || exit;
 
-/** A setting from the theme's options page, through the i18n helper when the theme has one. */
+/**
+ * A setting from the theme's options page, through the i18n helper when the theme has one.
+ * Without ACF/SCF active there is no setting at all: the theme's helper calls get_field()
+ * unguarded, so it is not reached either.
+ */
 function __prefix___store_enquiry_setting( $name ) {
+	if ( ! function_exists( 'get_field' ) ) {
+		return '';
+	}
 	if ( function_exists( '__prefix___get_field' ) ) {
 		return __prefix___get_field( $name, 'option' );
 	}
-	return function_exists( 'get_field' ) ? get_field( $name, 'option' ) : '';
+	return get_field( $name, 'option' );
 }
 
-/** Digits only, 8 to 15 of them (E.164 without the plus), or '' when it is not a number. */
+/**
+ * Digits only, 8 to 15 of them (E.164 without the plus), or '' when it is not one number.
+ * Only a plus, digits, spaces, dots, dashes and brackets are accepted: "ext 22" or a second
+ * number after a slash would otherwise be glued onto the first and link to a stranger.
+ */
 function __prefix___store_whatsapp_number() {
-	$digits = preg_replace( '/\D+/', '', (string) __prefix___store_enquiry_setting( 'store_whatsapp_number' ) );
+	$raw = trim( (string) __prefix___store_enquiry_setting( 'store_whatsapp_number' ) );
+	if ( ! preg_match( '/^\+?[\d\s().-]+$/', $raw ) ) {
+		return '';
+	}
+	$digits = preg_replace( '/\D+/', '', $raw );
 	$len    = strlen( $digits );
 	return ( $len >= 8 && $len <= 15 ) ? $digits : '';
 }
@@ -75,7 +90,7 @@ add_action( 'acf/init', function () {
 
 /** The enquiry block for one product, or '' when no channel is filled in or the store sells. */
 function __prefix___store_enquiry_html( $product ) {
-	if ( ! function_exists( 'store_kit_catalog_mode' ) || ! store_kit_catalog_mode() || ! $product ) {
+	if ( ! function_exists( 'store_kit_catalog_mode' ) || ! store_kit_catalog_mode() || ! $product instanceof WC_Product ) {
 		return '';
 	}
 	$parts  = array();

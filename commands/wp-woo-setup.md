@@ -189,16 +189,23 @@ PHP 7.4 floor. **Copy it and substitute the two tokens; do not retype or "improv
 | `__prefix__` | the bare function prefix from `.claude/CLAUDE.md` (no trailing underscore) |
 | `__textdomain__` | the theme slug (the theme's `Text Domain`) |
 
+The installed file is always the substituted copy, never the raw template:
+
 ```bash
-tmp=$(mktemp)
+tmp=$(mktemp); dest="<theme>/inc/store-enquiry.php"
 sed -e "s/__prefix__/<prefix>/g" -e "s/__textdomain__/<slug>/g" \
   "${CLAUDE_PLUGIN_ROOT}/templates/store/store-enquiry.php" > "$tmp"
-if grep -q '__prefix__\|__textdomain__' "$tmp"; then echo "UNSUBSTITUTED TOKENS"; exit 1; fi
-php -l "$tmp"
+if grep -q '__prefix__\|__textdomain__' "$tmp"; then echo "UNSUBSTITUTED TOKENS"; rm -f "$tmp"; exit 1; fi
+php -l "$tmp" || { rm -f "$tmp"; exit 1; }
+if [ ! -f "$dest" ]; then mkdir -p "$(dirname "$dest")" && cp "$tmp" "$dest" && echo INSTALLED
+elif cmp -s "$tmp" "$dest"; then echo UNCHANGED
+else diff -u "$dest" "$tmp"; echo EDITED; fi
+rm -f "$tmp"
 ```
 
-`<theme>/inc/store-enquiry.php` absent: copy it in. Identical: leave it. Different: stop and
-show the diff — someone edited it — unless `--force`. Then require it from that theme's
+`INSTALLED` or `UNCHANGED`: go on. `EDITED`: someone changed the theme's copy; stop and show
+the diff, unless `--force`, which re-runs the block with `cp "$tmp" "$dest"` in the `EDITED`
+branch. Then require it from that theme's
 `functions.php`, unless the theme already loops over `inc/*.php` (never load it twice):
 
 ```php

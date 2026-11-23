@@ -17,6 +17,8 @@ need_token "$cmd" 'templates/store/store-enquiry.php'
 need_token "$cmd" 'do not retype or "improve" it'
 need_token "$cmd" '**Never fill the number or'
 need_token "$cmd" 'never load it twice'
+need_token "$cmd" 'cp "$tmp" "$dest" && echo INSTALLED'
+need_token "$cmd" 'The installed file is always the substituted copy'
 need_token "$tpl" "defined( 'ABSPATH' ) || exit;"
 need_token "$tpl" "store_kit_catalog_mode()"
 need_token "$tpl" "'__textdomain__-settings'"
@@ -37,7 +39,7 @@ php -l "$tmp/store-enquiry.php" >/dev/null || fail "$tpl does not parse"
 
 cat > "$tmp/run.php" <<'PHP'
 <?php
-// argv: catalog (0|1), number, message, form id, form post type
+// argv: catalog (0|1), number, message, form id, form post type, [variant: noacf|post]
 define( 'ABSPATH', __DIR__ . '/' );
 list( , $catalog, $number, $message, $form, $ftype ) = $argv;
 $GLOBALS['opt']   = array( 'store_whatsapp_number' => $number === '-' ? '' : $number, 'store_whatsapp_message' => $message === '-' ? '' : $message, 'store_enquiry_form' => $form === '-' ? '' : $form );
@@ -50,18 +52,24 @@ function esc_html__( $s, $d ) { return htmlspecialchars( $s ); }
 function esc_url( $u ) { return htmlspecialchars( $u, ENT_QUOTES ); }
 function absint( $v ) { return abs( (int) $v ); }
 function store_kit_catalog_mode() { return '1' === $GLOBALS['argv'][1]; }
-function fx_get_field( $n, $where ) { $GLOBALS['via'] = 'helper'; return $GLOBALS['opt'][ $n ]; }
+$variant = isset( $argv[6] ) ? $argv[6] : '';
+if ( 'noacf' !== $variant ) {
+	function get_field( $n, $where ) { return $GLOBALS['opt'][ $n ]; }
+}
+// The theme's helper calls get_field() unguarded, as the starter's does.
+function fx_get_field( $n, $where ) { $GLOBALS['via'] = 'helper'; return get_field( $n, $where ); }
 function acf_add_local_field_group( $g ) { $GLOBALS['group'] = $g; }
 function get_permalink( $id ) { return 'https://shop.test/p/' . $id; }
 function shortcode_exists( $s ) { return 'contact-form-7' === $s; }
 function get_post_type( $id ) { return $GLOBALS['argv'][5]; }
 function do_shortcode( $s ) { return '[FORM:' . $s . ']'; }
-class FxProduct { function get_name() { return 'Chair <b>"Oak"</b>'; } function get_id() { return 7; } }
+class WC_Product {}
+class FxProduct extends WC_Product { function get_name() { return 'Chair <b>"Oak"</b>'; } function get_id() { return 7; } }
 require __DIR__ . '/store-enquiry.php';
 $GLOBALS['hooks']['acf/init']();
 $loc = $GLOBALS['group']['location'][0][0]['value'];
 ob_start();
-$GLOBALS['product'] = new FxProduct();
+$GLOBALS['product'] = 'post' === $variant ? new stdClass() : new FxProduct();
 $GLOBALS['hooks']['woocommerce_single_product_summary']();
 $html = ob_get_clean();
 echo $loc . '|' . $GLOBALS['via'] . '|' . $html;
@@ -69,13 +77,17 @@ PHP
 
 run() { php "$tmp/run.php" "$@"; }
 expect_has()  { got=$(run "$@" | cut -d'|' -f3-); printf '%s' "$got" | grep -F -- "$EXPECT" >/dev/null || fail "case [$*]: expected '$EXPECT' in: $got"; }
-expect_none() { got=$(run "$@" | cut -d'|' -f3-); [ -z "$got" ] || fail "case [$*]: expected nothing, got: $got"; }
+expect_none() { got=$(run "$@" 2>&1 | cut -d'|' -f3- || true); [ -z "$got" ] || fail "case [$*]: expected nothing, got: $got"; }
 
 [ "$(run 1 - - - x | cut -d'|' -f1)" = fx-theme-settings ] || fail "the field group is not on the theme's settings page (<theme slug>-settings)"
 expect_none 0 '+1 813 555 0100' - 12 wpcf7_contact_form    # a store that sells: nothing
 expect_none 1 - - - x                                     # catalog, nothing filled: nothing
 expect_none 1 '123' - - x                                 # too short to be a number
 expect_none 1 '1234567890123456' - - x                    # too long (E.164 is 15 digits at most)
+expect_none 1 '+1 813 555 0100 ext 22' - - x              # an extension would be glued onto the number
+expect_none 1 '555 0100 / 555 0199' - - x                 # two numbers are not one
+expect_none 1 '+18135550100' - - x post                   # a builder hands a non-product: nothing, no fatal
+expect_none 1 '+18135550100' - 12 wpcf7_contact_form noacf  # ACF/SCF off: nothing, no fatal
 EXPECT='https://wa.me/18135550100?text=Hello%2C%20I%20would%20like%20to%20know%20more%20about%20Chair%20%3Cb%3E%22Oak%22%3C%2Fb%3E%20https%3A%2F%2Fshop.test%2Fp%2F7'
 expect_has 1 '+1 (813) 555-0100' - - x
 EXPECT='text=Call%20me%20Chair'
