@@ -19,7 +19,8 @@
  *
  * Without --order it writes nothing to the store: a cart session the Store API opens is deleted.
  * --url replaces the site's home URL (a `wp server` port, a host the machine resolves another
- * way); with --order it must be the home URL's host or loopback, the site WP-CLI cleans up on. A local site's certificate is not verified; any other site's is.
+ * way); with --order it must be the home URL's host or loopback, and the cart check's session must
+ * turn up in the database WP-CLI reads, or no order is placed: the clean-up runs through WP-CLI. A local site's certificate is not verified; any other site's is.
  *
  * Every line is `<status> <check>[: detail]`, status pass, fail, skip or note; the last line is
  * `verify: N passed, N failed, N skipped`.
@@ -205,11 +206,13 @@ function sessionKey(token) {
     return '';
   }
 }
+/** Delete the cart's session row; the number of rows deleted (0: not in this database). */
 function forget(token) {
   const key = token && sessionKey(token);
-  if (!key) return;
+  if (!key) return 0;
   const r = helper('forget-session', key);
   if (r.error) line('note', 'cart', `could not delete the verification's cart session ${key}: ${r.error}`);
+  return r.error ? 0 : r.forgotten;
 }
 
 const firstHop = await request(at('/')).catch((e) => e);
@@ -278,6 +281,9 @@ if (facts.coming_soon === 'yes') {
 // --- Cart through the Store API ------------------------------------------------------------------
 const sample = facts.sample;
 let cartOk = false;
+// Whether the site at the URL is the one WP-CLI reads: its cart session is in this database.
+// Only then can --order's clean-up reach the order it places.
+let sameSite = false;
 if (!sample) {
   line('fail', 'cart', 'no published simple product to put in a cart -- /wp-seed --products creates a demo\'s products');
 } else {
@@ -306,7 +312,7 @@ if (!sample) {
       } else line('fail', 'cart', `removing "${sample.name}": ${apiError(removed)}`);
     }
   }
-  forget(token);
+  sameSite = forget(token) > 0;
 }
 
 // --- The order (--order) ------------------------------------------------------------------------
@@ -317,6 +323,8 @@ if (order) {
   }
   if (!cartOk) {
     line('skip', 'order', 'the cart check failed');
+  } else if (!sameSite) {
+    line('fail', 'order', `no order placed: the cart the site at ${origin} opened is not in the database WP-CLI reads, so its order could not be cleaned up -- point --url at this WordPress`);
   } else {
     await placeOrder();
   }

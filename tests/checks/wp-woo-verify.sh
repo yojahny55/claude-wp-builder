@@ -34,6 +34,8 @@ need_token "$tool" "not this WordPress (\${new URL(facts.home).hostname}) or loo
 need_token "$tool" "if (facts.orders > 0) refuse.push("
 need_token "$tool" "const drift = planLines.filter((l) => l.startsWith('would-set '));"
 need_token "$tool" "const r = helper('forget-session', key);"
+need_token "$tool" "sameSite = forget(token) > 0;"
+need_token "$tool" "} else if (!sameSite) {"
 need_token "$tool" "rejectUnauthorized: !local"
 need_token "$tool" "const plan = evalFile(SETUP, project, 'dry-run');"
 # --order's refusal comes before the first request to the site.

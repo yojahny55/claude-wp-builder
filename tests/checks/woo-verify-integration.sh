@@ -148,6 +148,17 @@ case "$(last "$got")" in "refused: "*" | 1") ;; *) fail "--order beside another 
 q "wc_get_order( $CLIENT )->delete( true );"
 got=$(node bin/woo-verify.mjs "$PROJ" --url "http://shop.example.test/" --order 2>&1 || true)
 has "$got" 'refused: --order places an order only on a local store that sells and has none -- --url points at shop.example.test'
+# Loopback on another port is another site: a stand-in Store API whose cart is not in this
+# database. No order may be placed, on it or here.
+FAKE=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')
+python3 tests/fixtures/wp/fake-store-api.py "$FAKE" "$PRODUCT" >/dev/null 2>&1 &
+FAKE_PID=$!
+for _ in $(seq 1 20); do curl -s -o /dev/null "http://127.0.0.1:$FAKE/" && break; sleep 0.2; done
+got=$(node bin/woo-verify.mjs "$PROJ" --url "http://127.0.0.1:$FAKE/" --order 2>&1 || true)
+kill "$FAKE_PID" 2>/dev/null || true
+has "$got" 'pass cart: "Fixture Mug" added and removed through the Store API'
+has "$got" "fail order: no order placed: the cart the site at http://127.0.0.1:$FAKE opened is not in the database WP-CLI reads"
+[ "$(orders)" = 0 ] || fail "--order placed an order through a site WP-CLI does not read"
 $WP config set WP_ENVIRONMENT_TYPE staging --type=constant --quiet
 got=$(verify --order)
 has "$got" 'refused: --order places an order only on a local store that sells and has none -- the site reads as staging, not local'
