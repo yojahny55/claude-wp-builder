@@ -7,7 +7,7 @@ Verify required WordPress theme files and configurations:
 1. **style.css** exists at theme root with proper headers (Theme Name, Version, Description, Author, Text Domain)
 2. **index.php** exists (required WordPress fallback)
 3. **screenshot.png** is the site's own preview: 1200x900, taken from the built homepage.
-   Both starters ship a 1x1 placeholder, and a delivered theme that still carries it shows a
+   The tailwind starter ships a 1x1 placeholder and the cinematic starter none, and a delivered theme that still carries it shows a
    blank tile in Appearance > Themes. Read the PNG size:
    ```bash
    python3 -c "import struct,sys; b=open(sys.argv[1],'rb').read(24); print('%dx%d' % struct.unpack('>II', b[16:24]) if b[1:4]==b'PNG' else 'not-a-png')" <theme-dir>/screenshot.png

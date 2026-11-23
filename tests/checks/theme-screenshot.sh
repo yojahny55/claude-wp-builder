@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bin/theme-screenshot.mjs writes a theme's screenshot.png from the built homepage, because
-# both starters ship a 1x1 placeholder and a delivered theme otherwise previews as a blank
-# tile. This pins where it runs (/wp-yolo Phase 3, the /wp-finalize Check 4 FAIL) and runs
+# the tailwind starter ships a 1x1 placeholder (the cinematic one none) and a delivered theme
+# otherwise previews as a blank tile. This pins where it runs (/wp-yolo Phase 3, the /wp-finalize Check 4 FAIL) and runs
 # it against a local page: the placeholder is replaced by a 1200x900 capture, a real preview
 # is kept unless --force, and a failing page, a missing browser or bad arguments never touch
 # the file. The browser part skips on a machine with no playwright-core or Chrome.

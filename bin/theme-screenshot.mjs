@@ -3,8 +3,9 @@
  * theme-screenshot.mjs: write a theme's screenshot.png from the built site's homepage.
  *
  * WordPress shows screenshot.png as the theme's preview in Appearance > Themes, at 1200x900
- * (4:3). Both starter themes ship a 1x1 placeholder, so without this every delivered theme
- * previews as a blank tile. /wp-finalize Check 4 runs it.
+ * (4:3). The tailwind starter ships a 1x1 placeholder and the cinematic one none, so without
+ * this a delivered theme previews as a blank tile. /wp-yolo runs it; /wp-finalize Check 4
+ * fails a theme without a real preview and names this command as the fix.
  *
  * Usage: theme-screenshot.mjs <url> <theme-dir> [--force]
  *
