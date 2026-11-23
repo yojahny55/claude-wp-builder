@@ -47,6 +47,8 @@ load-bearing gates rather than helpers:
   (pixelmatch over the shared area, width and height deltas apart), with demo, site and diff images.
 - `demo-scripts.mjs` — the inline JavaScript bodies of a demo page (no `src`, no JSON-LD,
   comments dropped), optionally filtered by a regex: which scripts touch a section.
+- `export-platform.mjs` — the commands as `AGENTS.md`, Cursor rules (`.cursor/rules/*.mdc`) or Gemini
+  CLI commands (`GEMINI.md`, `.gemini/commands/*.toml`) for agents other than Claude Code, paths absolute.
 - `theme-screenshot.mjs` — the theme's 1200x900 `screenshot.png` from the built homepage.
 - `decision-sheet.mjs` — the approval page for `design_impact` findings and the parser for its
   answers.
