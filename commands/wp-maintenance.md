@@ -38,8 +38,9 @@ Read the WP-CLI wrapper once and use it as `$WP` below:
 bash -c 'node "$1/bin/wp-config.mjs" get "$2" wp_cli.wrapper' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT_PATH}'
 ```
 
-Read `.claude/CLAUDE.md` for the function prefix and the theme directory and slug. If it is
-missing, tell the user to run `/wp-init` first and stop.
+Read `.claude/CLAUDE.md` for the function prefix and the theme directory and slug. `<theme>`
+is the theme that owns the `functions.php` this command edits — on a child theme, the child,
+never its parent. If it is missing, tell the user to run `/wp-init` first and stop.
 
 ## Step 2: Arguments
 
@@ -97,12 +98,14 @@ already load `inc/maintenance.php`, add this block before its final closing stat
 missing file never fatals the theme:
 
 ```php
-$maintenance = get_template_directory() . '/inc/maintenance.php';
+$maintenance = __DIR__ . '/inc/maintenance.php';
 if ( is_readable( $maintenance ) ) {
     require_once $maintenance;
 }
 ```
 
+`__DIR__`, not `get_template_directory()`: on a child theme that function returns the
+parent, the file is never found, and `on` silently does nothing.
 If the theme loops over `inc/*.php`, it already loads the file: never load it twice.
 While the option is absent the file only registers two hooks that read one option and
 return, so installing it changes nothing a visitor sees.

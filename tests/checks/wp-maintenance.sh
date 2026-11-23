@@ -16,6 +16,8 @@ need_token "$cmd" 'templates/maintenance/maintenance.php'
 need_token "$cmd" 'do not retype or "improve" it'
 need_token "$cmd" 'Different without `--force`: stop and show the diff'
 need_token "$cmd" 'never load it twice'
+need_token "$cmd" '$maintenance = __DIR__ . '"'"'/inc/maintenance.php'"'"';'
+if grep -n '= get_template_directory() . ./inc/maintenance.php' "$cmd" >/dev/null; then fail "$cmd loads inc/maintenance.php from the parent theme; a child theme never finds it"; fi
 need_token "$cmd" '$WP option delete <prefix>_maintenance'
 need_token "$cmd" "**Do not use WooCommerce's coming-soon mode for"
 need_token "$cmd" 'this command never writes it'
