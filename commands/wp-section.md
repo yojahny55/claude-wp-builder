@@ -181,7 +181,7 @@ If the page template does not exist yet, create it with `get_header()`, `<main>`
 
 A section whose demo has a script — a carousel, a gallery, tabs, an accordion, a filter, a
 form check — is not built until the script is. Skip this step under `--transcribe` (the
-`/wp-yolo` run ports every script once, at its Step 4.6), under `--hybrid`, and on a
+`/wp-yolo` run ports every script once, in its behaviour-carry step), under `--hybrid`, and on a
 `cinematic` theme. Otherwise find the scripts that touch the section: inline `<script>`
 blocks in the demo page, and every `demo/**/*.js` (and `src="…js"` the page loads) that
 names the section root's classes, ids or `data-` attributes:
