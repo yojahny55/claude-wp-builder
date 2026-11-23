@@ -1,7 +1,7 @@
 ---
 description: One-shot section builder — generates ACF fields + template part + CSS for a section from the demo
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent
-argument-hint: "<section-name> | --list [--page <slug>] [screenshot-path] [--cf7] [--hybrid] [--no-hybrid] [--defer-promotion] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--no-blog-page] [--force-adopted]"
+argument-hint: "<section-name> | --list [--page <slug>] [screenshot-path] [--cf7] [--hybrid] [--no-hybrid] [--defer-promotion] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--no-blog-page] [--visual] [--force-adopted]"
 ---
 
 # WP Section — One-Shot Section Builder
@@ -46,6 +46,7 @@ Parse `$ARGUMENTS`:
   - `tailwind` → the converted demo page itself (HTML, converted in place by `/wp-yolo` Step 2.6), and the SOURCE OF TRUTH exactly as the CSS blob is on `basic`: its utility classes and element structure are the declared values (Step 5's transcription overlay).
 
 - **`--no-blog-page` flag** = skip Step 6.7 (`/wp-page blog` after a blog section)
+- **`--visual` flag** = pixel-compare the built section with its demo and loop the CSS agent on the difference (Step 6.6)
 - **`--defer-promotion` flag** = `tailwind` only. Skip the `wp-tailwind` author-mode dispatch (Step 5). Set by `/wp-yolo` on the section walk; `/wp-yolo` Step 4.4 then runs one promotion pass over every template part. Ignored on `basic`. Never set it by hand for a one-off section: no later pass would promote its utilities.
 
 > **Note:** `/wp-yolo` sets `--transcribe --block <block> --css <css-source>` on every `/wp-section` dispatch, plus `--defer-promotion` on the `tailwind` path (see `commands/wp-yolo.md` Steps 4 and 4.4). When invoked by hand without these flags, `/wp-section` keeps its original design-system authoring behavior.
@@ -53,7 +54,7 @@ Parse `$ARGUMENTS`:
 If no section name is provided and `--list` is absent, print an error:
 ```
 Error: Section name is required.
-Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--no-blog-page]
+Usage: /wp-section <section-name> [screenshot-path] [--cf7] [--hybrid] [--page <slug>] [--target <template>] [--transcribe] [--block <name>] [--css <source>] [--no-blog-page] [--visual]
 Example: /wp-section hero
          /wp-section --list
          /wp-section services /path/to/screenshot.png
@@ -217,6 +218,11 @@ Silent no-op on a non-Tailwind theme; skips itself when the user has `npm run pr
 running (the watcher already owns `dist/`). Do this before the summary — a summary that
 lists files no browser can see yet is not a finished section.
 
+## Step 6.6: Visual check (`--visual` only)
+
+Skip unless `--visual` is set. Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-section-run/references/visual-check.md` now and follow it:
+`bin/section-diff.mjs` against the demo, the CSS agent on what differs, at most three rounds.
+
 ## Step 6.7: Blog templates
 
 Applies only when the section slug is `blog`, `journal`, `news` or `posts`.
@@ -249,6 +255,7 @@ Files created/updated:
   - components/<page-slug>.css or utilities/site.css (only if a rule was needed) [tailwind only]
   - <page-template>.php (added get_template_part call)
   - Blog templates: built by /wp-page blog | skipped (<reason>) [blog sections, Step 6.7]
+  - Visual: pass | pass after <n> fix rounds | over tolerance — <viewports> | not measured (<reason>) [--visual, Step 6.6]
   - Behaviour: assets/js/src/sections/<slug>.js (wp-js) | no behaviour | BLOCKED: <reason> [Step 6.4]
 
 Fields registered:
