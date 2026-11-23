@@ -24,6 +24,7 @@ and said nothing about the layer the defect was actually in.
 | rendered output | `wp-audit-seo` (head), `wp-audit-geo` (head, schema graph, DOM) | `og:site_name`, dangling schema `@id` |
 | serving layer | `wp-audit-geo` (GEO-A26, GEO-A27) | a physical root file shadowing a theme rewrite, CDN path rewrites |
 | the page a person sees | `wp-audit-ux` | a required mark that is not there, a link that 404s, 142 characters to a line, a logo that moves between templates |
+| the store: its pages, cart and data | `wp-audit-store` (`site.commerce: woocommerce` only) | a checkout that 404s, no shipping method at the store's own address, an empty terms page, a production store in test mode |
 
 An agent whose surface needs Tier 2 and does not have it reports those codes `UNMEASURED`,
 never `PASS`. Say so in the prompt, so the agent does not quietly narrow its scope to the part
@@ -153,7 +154,7 @@ Where Design impact is `true` when applying the fix could change how the site re
   change (a `<span>` that becomes a `<button>` changes the render with no value edited). It is
   independent of Owner, and `false` means the fix leaves every computed style and box as it was.
   `/wp-audit` Step 9 never applies a `true` finding without asking.
-Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, WP-NNN, GEO-Dnn/Axx/Uxx/Pxx, UX-NNN
+Where CODE follows the pattern: SEC-NNN, SEO-NNN, A11Y-NNN, PERF-NNN, WP-NNN, GEO-Dnn/Axx/Uxx/Pxx, UX-NNN, STORE-NNN
 
 The findings JSON you return has exactly this skeleton. Keep every top-level key, even when
 its list is empty; `findings` holds FAIL rows only, one object per defect and resource:
@@ -182,6 +183,7 @@ Use these `subagent_type` values:
 - `wp-audit-practices` — best practices checks (ABSPATH guards, escaping, i18n, theme supports, coding standards, enqueue patterns, template hierarchy)
 - `wp-audit-geo` — GEO/AI-agent readiness checks (ORA layers Discovery/Access/Usability/Payments, AI crawler allowlist, `llms.txt` and ARD catalog, rendered-head DOM checks, agent-skills index, is-agentic live scan)
 - `wp-audit-ux` — usability checks (forms and data entry, navigation and task flow, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages)
+- `wp-audit-store` — store checks, only when `site.commerce` is `woocommerce` (setup drift, store pages, shop and cart from outside, policy pages, email sender, shipping, tax, product data, failed scheduled actions, order-table sync, launch state). Its prompt also carries the WordPress root and `Report-only`: the agent passes `--read-only` to its tool on a report-only run
 
 **Shard by surface when the read-only scope is large.** One agent per category cannot read a
 parent theme plus two dozen plugins, and an agent that cannot narrows on its own and says so
@@ -203,7 +205,7 @@ checks that are not about source files (rendered output, options, headers) run i
 category: findings concatenate, `checks_executed` is the union, and Step 6.8's coverage is
 computed on the union, so a check that no shard executed is reported as never run. Keep the
 dispatch to at most 4 agents at a time. The rendered-surface categories (`seo`, `geo`,
-`a11y` page checks, `usability`) are not sharded: their surface is the site, not a path list.
+`a11y` page checks, `usability`, `store`) are not sharded: their surface is the site, not a path list.
 
 **`wp-audit-ux` is dispatched with the page list from Step 2.7, and its prompt says so.**
 It is the only auditor whose scope is a set of URLs rather than the theme directory, and an

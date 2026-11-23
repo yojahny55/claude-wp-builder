@@ -60,6 +60,9 @@ fails a profile that installs one without a reason, or installs anything under *
   Printify's integration needs a paid plan.
 - **Wholesale** — `woocommerce-wholesale-prices`; its premium Lead Capture add-on must be
   2.0.3.2 or later (earlier versions were actively exploited in 2026).
+- **Subscriptions and bookings** — not built: the free subscriptions plugin is rejected above,
+  and WooCommerce's own extensions are paid, with no licence here to test them. The merchant
+  installs them from their own account (`docs/known-ceilings.md`).
 - **Multilingual** — Polylang, which leaves products untranslated: this plugin has no bridge
   between WooCommerce and Polylang. Never SCF suffix fields for a store: one URL per product
   cannot rank in two languages.

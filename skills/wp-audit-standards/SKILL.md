@@ -10,7 +10,7 @@ The contract every `wp-audit-*` agent shares: how a finding is graded, named and
 when a check is `N/A`, how a sweep and a production request are paced, and the thresholds
 the agents measure against. Each domain's own check catalog lives in its agent, and in
 `wp-audit-seo-standards`, `wp-audit-local-standards`, `wp-audit-geo-standards` and
-`wp-audit-ux-standards`.
+`wp-audit-ux-standards`; the store's (`STORE-NNN`) is in `agents/wp-audit-store.md`.
 
 `$WP` throughout is the WP-CLI wrapper from the project's `.wp-create.json`
 (`wp_cli.wrapper`).
@@ -166,6 +166,7 @@ removing code and design decisions are never auto-fixable.
 | `WP-NNN` | Best Practices |
 | `GEO-Dnn`, `GEO-Ann`, `GEO-Unn`, `GEO-Pnn` | GEO / AI-agent readiness, by ORA layer |
 | `UX-NNN` | Usability |
+| `STORE-NNN` | A WooCommerce store's readiness to sell (`wp-audit-store`, WooCommerce sites only) |
 | `A11Y-AXE-*`, `PERF-LH-*` | Evidence rows from the browser suite — measurements of an existing criterion, never criteria of their own |
 
 #### Unused and retired ids

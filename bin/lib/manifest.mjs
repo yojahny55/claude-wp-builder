@@ -138,10 +138,11 @@ function at(obj, dotted) {
 // same ones in prose, and two lists that must agree and live apart drift -- which is the
 // defect the diff itself exists to catch, so it would be a poor place to reproduce it.
 //
-// `usability` is last and was added last, which matters to a manifest written before it
-// existed: an absent category is never-run, not passed, so an older project reports it as
-// a category it has yet to be audited against rather than as a clean one.
-export const AUDIT_CATEGORIES = ['security', 'seo', 'a11y', 'performance', 'best-practices', 'geo', 'usability'];
+// `usability` and `store` were added last, which matters to a manifest written before them:
+// an absent category is never-run, not passed, so an older project reports it as a category
+// it has yet to be audited against rather than as a clean one. `store` is offered only on a
+// WooCommerce site (Step 2.5d), so a site without one never reports it never-run.
+export const AUDIT_CATEGORIES = ['security', 'seo', 'a11y', 'performance', 'best-practices', 'geo', 'usability', 'store'];
 
 // SEC-036, WP-049, SEO-054, A11Y-012, PERF-054, GEO-A11 -- a letter-and-digit prefix, then
 // an optional letter before the number. This validates the SHAPE of an id and deliberately

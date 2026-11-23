@@ -1,17 +1,17 @@
 ---
-description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness, usability
+description: Comprehensive audit — security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness, usability, and a WooCommerce store's readiness to sell
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
-argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--usability] [--all] [--report-only] [--report md|html|both] [--report-lang en|es] [--suite] [--pages <list|auto|none>] [--host <public-url>] [--security-level basic|recommended|maximum]"
+argument-hint: "[--security] [--seo] [--a11y] [--performance] [--best-practices] [--geo] [--usability] [--store] [--all] [--report-only] [--report md|html|both] [--report-lang en|es] [--suite] [--pages <list|auto|none>] [--host <public-url>] [--security-level basic|recommended|maximum]"
 ---
 
 # WP Audit — Comprehensive Site Audit
 
-Run a comprehensive audit across security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness and usability. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
+Run a comprehensive audit across security, SEO, accessibility, performance, best practices, GEO/AI-agent readiness, usability and, on a WooCommerce site, the store. Reports issues with severity levels and offers to auto-fix what it can. Dispatches specialized audit agents and optionally configures Rank Math SEO and All-in-One WP Security.
 
 ## Step 1: Parse Arguments
 
 Parse `$ARGUMENTS` for:
-- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`, `--geo`, `--usability`
+- **Category flags:** `--security`, `--seo`, `--a11y`, `--performance`, `--best-practices`, `--geo`, `--usability`, `--store`
 - **`--all` flag** (default if no category flags provided)
 - **`--report-only` flag** (skip fix phase)
 - **`--security-level basic|recommended|maximum`** (default: `recommended`, ignored if `--report-only`)
@@ -33,12 +33,18 @@ Parse `$ARGUMENTS` for:
   without rewriting the manifest it still develops against. Used by the live scan in Step 9
   and by nothing else — it does not change which site WP-CLI talks to.
 
-If `--all` or no category flags are present: enable all 7 categories (security, seo, a11y, performance, best-practices, geo, usability).
+If `--all` or no category flags are present: enable all 8 categories (security, seo, a11y, performance, best-practices, geo, usability, store).
+
+**`store` applies only to a WooCommerce site.** Step 2.3 sets `site.commerce`; when it is
+`none`, the store category is not dispatched, prints `store: N/A (no WooCommerce)`, and is left
+out of the coverage diff (Step 2.5d), of `categories_run` and of every count — selected by
+`--all` or typed as `--store` alike. A blog audited after the category shipped scores exactly as
+it did before.
 
 - **`--pages <list|auto|none>`** — which pages the page-level criteria are measured on.
   `auto` derives the list; `none` skips the page walk and reports every page-level check
   `UNMEASURED`. Default: `auto` whenever the **usability category is selected** or `--suite`
-  is given, `none` otherwise, because the other six audit the theme and need no page list.
+  is given, `none` otherwise, because the other categories audit the theme, or the store's data, and need no page list.
   Selected, not typed: `--all` and a bare `/wp-audit` both select usability without naming
   it, and keying this off the literal flag would make the commonest invocation report the
   whole category `UNMEASURED` — the quiet failure Step 2.7 exists to prevent.
@@ -280,7 +286,7 @@ If `--security` is not selected or `--report-only` is set, skip this step.
 
 For each selected category, dispatch the corresponding agent using the Agent tool. Pass complete context in each agent prompt.
 
-**Dispatch order:** security → seo → a11y → performance → practices → geo → usability
+**Dispatch order:** security → seo → a11y → performance → practices → geo → usability → store (WooCommerce sites only)
 
 **When a production host is in play** (`--host`, or a production URL confirmed in Step 2.3),
 create `<scratch>/prod-gate` before dispatching and pass it as the gate dir in every prompt.

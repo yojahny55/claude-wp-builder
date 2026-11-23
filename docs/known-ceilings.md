@@ -498,6 +498,19 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
 - **The fixture proves checkout through the Store API with cash on delivery.** A real card
   payment and Stripe's own flow are never exercised — no network, no bill — and Turnstile's
   verification is a stub at the HTTP boundary (`tests/fixtures/wp/net-guard.php`).
+- **The store audit judges what a store can sell, not what it should.** `wp-audit-store` reads
+  whether a shipping method reaches the store's own address, not every country the store
+  ships to; whether taxes on have a rate, not whether the rate is right or taxes should be on;
+  whether a policy page says something, not whether it says enough. Its cart check needs a
+  session, so a report-only run leaves STORE-004 `UNMEASURED`. On a store with no `store` block
+  the tier is inferred (catalog when `store-kit`'s catalog mode is on, a selling store
+  otherwise), and cash on delivery is never a launch item there: it may be the merchant's.
+- **No subscriptions and no bookings.** The free subscriptions plugin is rejected
+  (`skills/wp-woocommerce/references/plugins.md`), and WooCommerce's own Subscriptions and
+  Bookings are paid extensions this repository has no licence to install or test, so neither
+  could be built with a check on a real store. A store that needs them gets the extension from
+  the merchant's own account, installed by hand; `/wp-woo-setup` and the store audit leave its
+  settings alone, and `STORE-*` measures the rest of the store as usual.
 - **Tax is merchant-provided rates.** No tax engine; Stripe Tax is the documented upgrade.
 - **Setup reads Stripe keys from the environment and `.wp-create.local.json` inside the WP-CLI
   wrapper's own environment.** A Docker wrapper sees neither the host's environment nor host

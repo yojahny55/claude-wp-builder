@@ -185,6 +185,12 @@ Fixes include: a required-field mark, a missing active state, hover feedback, sp
 between action elements, a `max-width` in `ch`, an underline on a link that is
 distinguishable only by colour.
 
+**Store fixes:** none are applied here. Every `STORE-*` finding is `auto_fixable: false` and its
+`fix` names who applies it: `/wp-woo-setup` for drift, store pages, shipping and tax recorded in
+the `store` block; `/wp-seed --products` or the merchant for products; the client for the text
+of the policy pages; and, for STORE-014, the launch step in `skills/wp-woocommerce` — never a
+launch setting switched off on its own. List them in the fix offer as steps for the operator.
+
 **Every one of those changes how the site looks**, and four of them move layout. Pass the
 agent its own Step 4: measure `getComputedStyle()` and `getBoundingClientRect()` before and
 after, at desktop and mobile, on every element carrying the class — and report both sets.

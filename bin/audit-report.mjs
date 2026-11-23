@@ -1239,7 +1239,7 @@ const HTML_UI = {
     },
     categoryNames: {
       security: 'Security', seo: 'SEO', a11y: 'Accessibility', performance: 'Performance',
-      'best-practices': 'Best practices', geo: 'GEO / AI agents', usability: 'Usability',
+      'best-practices': 'Best practices', geo: 'GEO / AI agents', usability: 'Usability', store: 'Store',
     },
   },
   es: {
@@ -1274,7 +1274,7 @@ const HTML_UI = {
     },
     categoryNames: {
       security: 'Seguridad', seo: 'SEO', a11y: 'Accesibilidad', performance: 'Rendimiento',
-      'best-practices': 'Buenas prácticas', geo: 'GEO / agentes IA', usability: 'Usabilidad',
+      'best-practices': 'Buenas prácticas', geo: 'GEO / agentes IA', usability: 'Usabilidad', store: 'Tienda',
     },
   },
 };

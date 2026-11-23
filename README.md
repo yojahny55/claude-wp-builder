@@ -555,6 +555,7 @@ commands — `/wp-robin`, `/wp-aos-animator`, and `/wp-s3` with `/wp-s3-media`. 
 | `wp-audit-aios` · `wp-audit-rankmath` | The two audit installers — All-in-One WP Security (haiku, mechanical WP-CLI config) and Rank Math (sonnet, because schema conflicts, title quality and the Polylang route are judgment) |
 | `wp-audit-geo` | GEO / AI-agent-readiness auditor — maps the ORA check catalog to GEO codes, parses the rendered DOM and runs the is-agentic scan |
 | `wp-audit-ux` | Usability auditor — forms, navigation, links followed rather than inferred, hover and active states, rendered line length per breakpoint, logo and typography consistency across pages |
+| `wp-audit-store` | Store auditor (WooCommerce sites only) — setup drift, store pages, shop and cart from outside, policy pages, email sender, shipping, tax, product data, failed scheduled actions, order-table sync, launch state |
 | `wp-agentic-surfaces` | Agentic-surfaces fixer — emits the theme's `inc/agentic.php` (llms.txt, ARD catalog, agent-skills index, markdown negotiation, Link headers, agent-friendly 404, JSON-LD breadth), seeds trust anchors and writes the robots AI policy |
 
 ### Starter Theme
@@ -667,7 +668,7 @@ The `/wp-create` command supports multiple environment types:
 
 ## Audit & Quality
 
-The `/wp-audit` command runs a comprehensive audit across 7 categories and offers to auto-fix issues.
+The `/wp-audit` command runs a comprehensive audit across 8 categories (the store one only on a WooCommerce site) and offers to auto-fix issues.
 
 ### Categories
 
@@ -680,6 +681,7 @@ The `/wp-audit` command runs a comprehensive audit across 7 categories and offer
 | `--best-practices` | WordPress coding standards | — |
 | `--geo` | GEO / AI-agent readiness, ORA-scored | is-agentic live scan |
 | `--usability` | Forms, navigation, links, feedback, legibility, identity | — |
+| `--store` | Whether a WooCommerce store can sell and is launched (`STORE-NNN`); `N/A` without WooCommerce | `bin/woo-verify.mjs` |
 
 `--geo` scores how discoverable, accessible and usable a site is to AI agents and generative
 engines, following the four ORA layers (Discovery, Access, Usability, Payments). It detects the

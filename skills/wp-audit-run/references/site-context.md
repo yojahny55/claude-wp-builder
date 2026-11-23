@@ -41,6 +41,10 @@ after a new commerce check ships scores exactly as it did before, because that c
 `is-active`, not `is-installed`: a store with WooCommerce deactivated is not currently a
 store, and its commerce surfaces are not live to audit.
 
+The whole `store` category follows the same rule one level up: `wp-audit-store` is dispatched
+only when `site.commerce` is `woocommerce`, and on any other site the category is `N/A (no
+WooCommerce)` and out of every count (Step 1).
+
 ### Store tier — what the store sells
 
 A store set up by `/wp-woo-setup` records what it sells in `.wp-create.json`, and a catalog

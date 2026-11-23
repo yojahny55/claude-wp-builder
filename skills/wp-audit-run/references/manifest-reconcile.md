@@ -108,7 +108,9 @@ drift line under 2.5b and write the measured value.
 
 `audit.categories_run` records which categories have ever run on this project. Read it back
 and diff it against the categories this plugin version offers — `security`, `seo`, `a11y`,
-`performance`, `best-practices`, `geo`, `usability`:
+`performance`, `best-practices`, `geo`, `usability`, and `store` when Step 2.3 set
+`site.commerce` to `woocommerce`. On a site without WooCommerce the store category is not
+offered: it is never reported `NEVER RUN`, and its checks are never reported missing.
 
 ```
   coverage    NEVER RUN: geo
@@ -141,7 +143,8 @@ against `audit.checks_run[<category>]` — the IDs this project has actually exe
 The catalog is the set of check IDs in that category's own agent file — `SEC-*` in
 `agents/wp-audit-security.md`, `WP-*` in `agents/wp-audit-practices.md`, `SEO-*` in
 `agents/wp-audit-seo.md`, `A11Y-*` in `agents/wp-audit-a11y.md`, `PERF-*` in
-`agents/wp-audit-performance.md`, `GEO-*` in `agents/wp-audit-geo.md`. Usability is the
+`agents/wp-audit-performance.md`, `GEO-*` in `agents/wp-audit-geo.md`, `STORE-*` in
+`agents/wp-audit-store.md`. Usability is the
 one category whose table lives in its skill rather than its agent: `UX-*` is every **table
 row** of `skills/wp-audit-ux-standards/SKILL.md` — a line starting `| UX-NNN |`. The agent
 names only the handful its procedure measures, and the skill's prose names ids that are not

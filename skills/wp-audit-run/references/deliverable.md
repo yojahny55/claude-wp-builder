@@ -49,6 +49,7 @@ to look first:
 | `WP-*` | `code` — it is the theme's own source by definition | — |
 | `GEO-*` | `code` — `inc/agentic.php` and the surfaces it generates | the robots AI policy and anything written to an option are `setting`; trust-anchor prose is `content` |
 | `UX-*` | read it from `skills/wp-audit-ux-standards/SKILL.md`, which gives an owner per criterion | — |
+| `STORE-*` | read it from the catalog in `agents/wp-audit-store.md`, which gives an owner per check | — |
 
 The table is a starting point, not the answer. **Ask what the fix writes to**: a file in the
 theme is `code`, a row in the database or a server rule is `setting`, a sentence a person

@@ -1,7 +1,7 @@
 ---
 description: Check that a WooCommerce store works from the outside — setup has nothing left to change, the store pages answer, the shop lists products, a cart takes a product; with --order, a real test order on a local store, deleted afterwards
 allowed-tools: Read, Bash, Grep, Glob
-argument-hint: "[project-path] [--url <base-url>] [--order]"
+argument-hint: "[project-path] [--url <base-url>] [--order] [--read-only] [--tier catalog|store|full]"
 ---
 
 # /wp-woo-verify — prove a store works
@@ -35,7 +35,9 @@ bash -c 'node "$1/bin/wp-config.mjs" validate "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '$
 
 On exit 2, run the migration before continuing.
 
-No `store` block: stop, and say `/wp-woo-setup` records one first. Then read the recorded
+No `store` block: stop, and say `/wp-woo-setup` records one first — unless the operator passed
+`--tier`, which checks a store setup never touched (an adopted merchant's) at the tier they name:
+the setup check is skipped and `--order` is refused. Then read the recorded
 environment:
 
 ```bash
@@ -54,6 +56,10 @@ bash -c 'node "$1/bin/woo-verify.mjs" "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '${PROJECT
 Append ` --order` only when the operator passed `--order`, and ` --url <base-url>` when they
 passed one: the site's home URL is used otherwise, and a local site's certificate is not
 verified.
+
+Append ` --read-only` when the operator passed it: the cart check is skipped too, so the run
+writes nothing at all, not even the cart session it would delete. `/wp-audit` passes it on a
+report-only run. Append ` --tier <tier>` when the operator passed it.
 
 Before a run with `--order`, tell the operator in one line that WooCommerce sends the order's
 emails for real — the new-order email to the store's recipient, which the `email` line names —

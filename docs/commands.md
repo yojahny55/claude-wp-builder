@@ -132,6 +132,8 @@ runs it at the end when a store profile was chosen.
 /wp-woo-verify [project-path]                    # setup's dry run, store pages, shop, cart; writes nothing
 /wp-woo-verify [project-path] --order            # also a cash-on-delivery order on a local store, deleted afterwards
 /wp-woo-verify [project-path] --url <base-url>   # check the site at another address (a port, a host resolved another way)
+/wp-woo-verify [project-path] --read-only        # no cart check either: not even a session is written
+/wp-woo-verify [project-path] --tier store       # a store with no store block (an adopted merchant's): no setup check, no --order
 ```
 
 Checks a store from outside with `bin/woo-verify.mjs`: `woo-setup.php`'s dry run plans
@@ -512,6 +514,18 @@ a form — a third of the catalog lives on those two and no ranking finds them. 
 capped at eight pages, one per template, and the cap is printed. **A page-level criterion
 with no page list reports `UNMEASURED`, never `PASS`**, because an audit that measured
 nothing and printed no failures reads exactly like a clean site.
+
+`--store` audits whether a WooCommerce store can sell and is launched, and runs only when
+WooCommerce is active: on any other site the category is `N/A` and out of every count, so a
+blog scores as it did before it existed. `wp-audit-store` owns it and holds the `STORE-NNN`
+catalog; `bin/store-audit.mjs` measures all of it — `bin/woo-verify.mjs` from outside (setup
+drift, store pages, shop, a Store API cart; `--read-only` on a report-only run, which leaves
+STORE-004 `UNMEASURED`), and `skills/wp-woocommerce/scripts/store-audit.php` from the
+database (policy pages that are published and say something, the email sender, a shipping
+method at the store's own address, tax rates when taxes are on, products with a price, image
+and category, failed scheduled actions, order-table sync, launch state). The launch state is
+`INFO` on a local or staging site and `CRITICAL` on production. No store finding is fixed by
+the audit: each names the command or person that fixes it.
 
 With a page list the report scores: criteria passed over criteria that applied, per page
 and overall. `N/A` and `UNMEASURED` are both excluded from the denominator and reported

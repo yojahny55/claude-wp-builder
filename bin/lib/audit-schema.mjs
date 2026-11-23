@@ -47,7 +47,7 @@ const STATUS_ALIASES = {
 const EXEMPT_ID = /^(A11Y-AXE|PERF-LH)-/; // browser-suite evidence rows, not catalog criteria
 // An id this plugin's catalogs would own; anything else (a suite metric, a custom row) is not
 // checked against them.
-const CATALOG_SHAPED = /^(SEC|SEO|A11Y|PERF|WP|UX)-\d+(@\d+)?$|^GEO-[DAUP]\d+(@\d+)?$/;
+const CATALOG_SHAPED = /^(SEC|SEO|A11Y|PERF|WP|UX|STORE)-\d+(@\d+)?$|^GEO-[DAUP]\d+(@\d+)?$/;
 
 export const CATALOGS = {
   security: 'agents/wp-audit-security.md',
@@ -57,6 +57,7 @@ export const CATALOGS = {
   'best-practices': 'agents/wp-audit-practices.md',
   geo: 'agents/wp-audit-geo.md',
   usability: 'skills/wp-audit-ux-standards/SKILL.md',
+  store: 'agents/wp-audit-store.md',
 };
 // Names agents and run files use for a category -> the catalog key.
 const CATEGORY_ALIASES = {
@@ -70,7 +71,7 @@ export function canonicalCategory(name) {
   return CATALOGS[mapped] ? mapped : null;
 }
 
-const ID_CELL = /^`?((?:SEC|SEO|A11Y|PERF|WP|UX)-\d+(?:@\d+)?|GEO-[DAUP]\d+(?:@\d+)?)`?$/;
+const ID_CELL = /^`?((?:SEC|SEO|A11Y|PERF|WP|UX|STORE)-\d+(?:@\d+)?|GEO-[DAUP]\d+(?:@\d+)?)`?$/;
 
 // The ids in a catalog: the first cell of every table row whose first cell is a check id.
 // Read from the agent's own file (and, for usability, its standards skill) -- never from a
@@ -96,6 +97,9 @@ export const ALLOWED_UNMEASURED = [
   { key: 'credentials', re: /credential|password|log-?in|api[ -]?key|token|authenticat|secret/i },
   { key: 'network', re: /network|third[- ]party|external (service|api|tool)|rate[- ]limit|quota|offline|dns/i },
   { key: 'production', re: /production|public url|prod[- ]gate|gate busy|host (is )?blocked|waf|live host/i },
+  // A report-only run writes nothing, and a few checks are a write: the store audit's Store API
+  // cart opens a session. The reason has to name the run and the write, not just the mode.
+  { key: 'report-only', re: /report-only run\b.*\b(write|session)/i },
   { key: 'tier', re: /needs? (a )?tier|tier [123] (is |was )?(not |un)?(available|run|reachable)|no tier [123]|tier [123] never ran|no wp-cli|no (browser tool and no suite)|no node/i },
 ];
 export function classifyUnmeasured(reason) {

@@ -304,8 +304,16 @@ Server setup, permissions, and WordPress configuration.
   shop lists products, a Store API cart takes one — and with `--order`, on a local store with no
   other order, places a cash-on-delivery order, sees its email sent, and deletes it with the stock
   back ([check](tests/checks/wp-woo-verify.sh), [on a real store](tests/checks/woo-verify-integration.sh)).
-  Piece 4 is delivered. Not started, each its own spec: the store audit and launch step, the
-  Polylang bridge, subscriptions, bookings.
+  Piece 4 is delivered. Piece 5 has its first half: `/wp-audit --store` dispatches
+  [`wp-audit-store`](agents/wp-audit-store.md) on a WooCommerce site only, against the
+  `STORE-NNN` catalog, measured by [its tool](bin/store-audit.mjs): `woo-verify` from outside
+  (read-only on a report-only run) and [the database checks](skills/wp-woocommerce/scripts/store-audit.php)
+  — policy pages, email sender, shipping at the store's address, tax rates, product data, failed
+  scheduled actions, order-table sync, and the launch state, `CRITICAL` on production
+  ([check](tests/checks/store-audit.sh), [on a real store](tests/checks/store-audit-integration.sh)).
+  Not started: the launch step (`/wp-woo-launch`, designed), then the Polylang bridge.
+  Subscriptions and bookings are closed as a [known ceiling](docs/known-ceilings.md): the free
+  plugin is rejected and the official extensions are paid, with no licence to test them.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`
   [The integration check](tests/checks/wp-woo-setup-integration.sh) failed once at "setup
