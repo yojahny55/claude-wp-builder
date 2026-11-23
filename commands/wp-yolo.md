@@ -351,8 +351,8 @@ Drive the existing commands/agents in this exact order, reading everything from 
    **`store` pages** (`pages[role=store]`) — same: no WP Page, no `/wp-section`, no ledger
    unit, whatever Step 2.5 recorded for them. WooCommerce renders them. List each under Review
    as "store page (`<store>`), rendered by WooCommerce"; with no `store` block in
-   `.wp-create.json`, add "run /wp-woo-setup first". Links to them (nav, buttons) are not
-   rewired: list each as "link to `<slug>`: point it at WooCommerce's `<store>` page".
+   `.wp-create.json`, add "run /wp-woo-setup first". Links to them (nav, buttons) are
+   rewired by `/wp-seed` in Step 5 (`--store-pages`); list what it reports skipped or missing.
    Their look is carried once, for all of them: read
    `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/store-layer.md` now and follow it — on
    a `tailwind` theme with a `store` block it installs the store stylesheet with
@@ -397,7 +397,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-yolo-run/references/behaviour-carry.md` no
 ## Step 5: Phase 3 — Seed & Finish
 
 Run, in order:
-1. **`/wp-seed --exclude-slugs <slugs>`** — create WP Pages with matching slugs (so
+1. **`/wp-seed --exclude-slugs <slugs> --store-pages <pairs>`** — create WP Pages with matching slugs (so
    `page-<slug>.php` auto-applies), populate ACF fields from extracted text per the
    project's `i18n strategy` — `/wp-seed` reads it from `.claude/CLAUDE.md` itself:
    under `suffix` it fills the primary language and flags secondary-language strings
@@ -406,6 +406,9 @@ Run, in order:
    wire them to fields, and build menus from the nav.
    Pass the manifest's top-level `assets[]` (role-tagged: `logo` / `nav-graphic` / `hero` /
    `content`) through so `/wp-seed` seeds each image by its role instead of guessing.
+   Pass `--store-pages` with every `pages[role=store]` entry as `<slug>=<store>`
+   (e.g. `--store-pages shop=shop,cart=cart`): `/wp-seed` builds no WP Page for them and points
+   the demo's nav items and buttons at WooCommerce's own pages.
    Set `--exclude-slugs` to the comma-joined slugs of every `pages[role=cpt-archive]` and `pages[role=store]` entry
    (e.g. `--exclude-slugs team`) so no stray WP Page is created for an archive slug — its
    URL comes from `has_archive`, and a WP Page would collide with `archive-<cpt>.php`.

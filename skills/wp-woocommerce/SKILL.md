@@ -33,6 +33,9 @@ A demo's store pages (shop, product, cart, checkout, account) are `role: store` 
 them. Their look goes into the `Section: Store demo` of the theme's `assets/css/store.css`,
 written on WooCommerce's own selectors: `references/store-selectors.md` maps each element a
 demo's store page draws to the selector that carries it, measured on WooCommerce 11.1.2.
+Their links are rewired by `/wp-seed --store-pages`, which runs
+`scripts/store-links.php`: a menu item whose object is WooCommerce's page, or that page's
+permalink for a link field. Run it through `/wp-seed`, not by hand.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the

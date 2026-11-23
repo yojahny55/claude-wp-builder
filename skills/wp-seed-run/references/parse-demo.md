@@ -16,6 +16,12 @@
   **skip** when creating WP Pages in Phase 2 (default: none — existing behavior unchanged).
   Use this to avoid creating a WP Page for a slug that is served by a CPT archive
   (`archive-<slug>.php` / `has_archive`), which would otherwise collide.
+- **`--store-pages <slug=surface,...>`** = optional; the demo's store pages and the WooCommerce
+  surface each one shows (`shop`, `product`, `cart`, `checkout`, `account`), e.g.
+  `--store-pages tienda=shop,carrito=cart`. `/wp-yolo` passes it from `pages[role=store]`.
+  Those slugs are excluded like `--exclude-slugs`, and every demo link to one of them (a nav
+  item, a button) points at WooCommerce's own page instead: Phase 6 for menus, Phase 4 for
+  link fields. Default: none.
 
 ### Locate the demo file
 

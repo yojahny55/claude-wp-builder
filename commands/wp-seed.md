@@ -1,7 +1,7 @@
 ---
 description: Seed WordPress content from demo HTML — parses sections, creates pages, imports media, populates ACF fields, builds menus, supports bilingual content
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>] [--force-fields] [--force-adopted]"
+argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>] [--store-pages <slug=surface,...>] [--force-fields] [--force-adopted]"
 ---
 
 # WP Seed — Content Seeding from Demo HTML
@@ -164,7 +164,7 @@ Conflicts go in this plan **and** in the Seed Report at the end, with the record
 
 ## Phase 2: Create Pages
 
-Create a WordPress page for each page found in the navigation (or each HTML file in multi-page demos). **Skip any slug listed in `--exclude-slugs`** — do not create a WP Page for it (its URL is provided by a CPT archive via `has_archive`, and a WP Page would collide with `archive-<slug>.php`).
+Create a WordPress page for each page found in the navigation (or each HTML file in multi-page demos). **Skip any slug listed in `--exclude-slugs`** — do not create a WP Page for it (its URL is provided by a CPT archive via `has_archive`, and a WP Page would collide with `archive-<slug>.php`). Skip every `--store-pages` slug the same way: WooCommerce owns that page, and Phases 4 and 6 point the demo's links at it.
 
 **Resolve by slug** (Phase 1.5). A page's title is edited freely by clients and its ID is not
 knowable in advance; the slug is what the demo, the menu and the template all agree on:
