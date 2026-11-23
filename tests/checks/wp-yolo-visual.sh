@@ -40,7 +40,8 @@ for m in 'playwright-core, pixelmatch or pngjs is not installed' 'no existing Ch
 done
 need_token "$ref" '(`--resume --visual`)'
 need_token "$cmd" '--resume [--accept-drift] [--visual]'
-need_token "$ref" 'assets/css/src/tailwindcss/components/'
+need_token "$ref" 'assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/`'
+need_token "$ref" 'deletes any file the agent created'
 need_token "$ref" 'is `group_<slug>`, where `<slug>` is'
 need_token "$ref" 'The three-round cap is per section.'
 need_token "$ref" '`kind: "cpt-teaser"` sections'

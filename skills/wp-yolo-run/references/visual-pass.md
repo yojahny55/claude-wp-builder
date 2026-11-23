@@ -53,9 +53,11 @@ them inside this run as:
 - `/wp-section`'s rebuild step: `bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>` on
   `tailwind`.
 - "The section's component CSS" on `tailwind`: every file under
-  `assets/css/src/tailwindcss/components/` that holds a rule for the section's block, which is
-  where Step 4.4's `@apply` promotion put them. Copy each one before a round, with the
-  template part.
+  `assets/css/src/tailwindcss/components/`, `layouts/` or `utilities/` that holds a rule for
+  the section's block (Step 4.4's promotion writes to `components/` and to
+  `utilities/site.css`), plus `assets/css/src/tailwindcss/main.css`. Copy each one before a
+  round, with the template part. Undoing a round also deletes any file the agent created
+  under those directories, and putting back `main.css` drops its `@import`.
 
 ## One section at a time
 
