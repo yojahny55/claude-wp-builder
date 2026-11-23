@@ -52,6 +52,10 @@ need_token "$ref" 'Without `--visual`, Step 6 prints no `Visual:` line.'
 need_token "$check" '--name=<slug> --fields=ID,url'
 need_token "$check" '`/wp-yolo --visual` runs this file itself'
 need_token "$check" 'mkdir -p "$start/before"'
+need_token "$check" 'cp -a "$theme/$part" "$start/before/$part"'
+need_token "$check" ': "${start:?}" "${theme:?}" "${part:?}"'
+need_token "$check" 'cp -a "$start/before/$part" "$theme/$part"'
+need_token "$check" 'round NOT undone'
 need_token "$check" 'cp -a "$src" "$start/before/tailwindcss"'
 # The undo paragraph swaps the whole tree back, so no rule or new file a round added survives.
 awk '/^\*\*A round that made it worse is undone\.\*\*/{on=1} on&&/^Then stop/{exit} on' "$check" \

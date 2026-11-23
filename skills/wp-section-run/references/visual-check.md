@@ -133,7 +133,11 @@ Each round, in this order:
    undone with the rest:
 
    ```bash
-   src="<theme-dir>/assets/css/src/tailwindcss"
+   start="<this round's starting --out directory>"
+   theme="<theme-dir>"; part="<the section's template part, relative to the theme>"
+   src="$theme/assets/css/src/tailwindcss"
+   mkdir -p "$start/before/$(dirname "$part")"
+   cp -a "$theme/$part" "$start/before/$part"
    cp -a "$src" "$start/before/tailwindcss"
    ```
 
@@ -145,13 +149,23 @@ Each round, in this order:
 
 **A round that made it worse is undone.** When the new measurement exits 2 or 4, or its worst
 `diffPercent` is higher than the round before, put back the copies from that round's
-`$start/before/`. On `tailwind`, swap the whole source tree back, keeping the undone one
-beside the copy, then rebuild:
+`$start/before/`. On `tailwind`, put back the template part and swap the whole source tree
+back, keeping the undone one beside the copy, then rebuild. The block sets its own paths
+(shell state does not carry between calls) and touches nothing when the copy is missing:
 
 ```bash
+start="<that round's starting --out directory>"
+theme="<theme-dir>"; part="<the section's template part, relative to the theme>"
+src="$theme/assets/css/src/tailwindcss"
+: "${start:?}" "${theme:?}" "${part:?}"
+[ -d "$start/before/tailwindcss" ] && [ -f "$start/before/$part" ] \
+  || { echo "no copy in $start/before: round NOT undone"; exit 1; }
+cp -a "$start/before/$part" "$theme/$part"
 rm -rf "$start/undone-tailwindcss"
 mv "$src" "$start/undone-tailwindcss" && cp -a "$start/before/tailwindcss" "$src"
 ```
+
+A `round NOT undone` is reported as such, never as "reverted".
 
 Then stop, and report the previous measurement with "last fix round reverted (<why>)". The tables
 above are for the first measurement; after a fix round, exits 2 and 4 mean the round broke
