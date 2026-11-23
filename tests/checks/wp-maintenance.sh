@@ -17,10 +17,11 @@ need_token "$cmd" 'do not retype or "improve" it'
 need_token "$cmd" 'Different without `--force`: stop and show the diff'
 need_token "$cmd" 'never load it twice'
 need_token "$cmd" '$WP option delete <prefix>_maintenance'
-need_token "$cmd" '**On a store, use WooCommerce'"'"'s own coming-soon mode and skip Step 4.**'
-need_token "$cmd" 'woocommerce_store_pages_only no'
+need_token "$cmd" "**Do not use WooCommerce's coming-soon mode for"
+need_token "$cmd" 'this command never writes it'
 need_token "$cmd" 'the status line must be `503` and `Retry-After` must be present'
 need_token "$cmd" 'wp-config.mjs" validate'
+if grep -En 'option (update|delete) woocommerce_' "$cmd"; then fail "$cmd writes WooCommerce launch state; /wp-woo-setup owns it"; fi
 need_token "$tpl" "defined( 'ABSPATH' ) || exit;"
 need_token README.md '/wp-maintenance'
 need_token docs/commands.md '(#wp-maintenance)'
@@ -35,7 +36,7 @@ if grep -q '__prefix__\|__textdomain__' "$tmp/maintenance.php"; then fail "$tpl 
 
 cat > "$tmp/run.php" <<'PHP'
 <?php
-// argv: option value ("-" = absent), can edit_posts (0|1), entry (front|rest)
+// argv: option value ("-" = absent), can edit_posts (0|1), entry (front|rest|rest-prior|rest-error)
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'DAY_IN_SECONDS', 86400 );
 $GLOBALS['opt']  = $argv[1] === '-' ? false : $argv[1];
@@ -45,7 +46,8 @@ $GLOBALS['status'] = 200;
 $GLOBALS['headers'] = array();
 class WP_Error { public $data; function __construct( $c, $m, $d ) { $this->data = $d; } }
 function add_action( $h, $f ) { $GLOBALS['hooks'][ $h ] = $f; }
-function add_filter( $h, $f ) { $GLOBALS['hooks'][ $h ] = $f; }
+function add_filter( $h, $f, $p = 10 ) { $GLOBALS['hooks'][ $h ] = $f; $GLOBALS['prio'][ $h ] = $p; }
+function is_wp_error( $v ) { return $v instanceof WP_Error; }
 function apply_filters( $h, $v ) { return $v; }
 function get_option( $k, $d = false ) { return $k === 'fx_maintenance' ? $GLOBALS['opt'] : $d; }
 function absint( $v ) { return abs( (int) $v ); }
@@ -71,8 +73,16 @@ if ( substr_count( $src, 'fx_header(' ) !== 1 || strpos( $src, "throw new Except
 function fx_header( $h ) { $GLOBALS['headers'][] = $h; }
 file_put_contents( __DIR__ . '/loaded.php', $src );
 require __DIR__ . '/loaded.php';
+if ( $argv[3] === 'rest-error' ) {
+    $e = new WP_Error( 'other', 'm', array( 'status' => 401 ) );
+    $r = $GLOBALS['hooks']['rest_authentication_errors']( $e );
+    echo $r === $e ? 'rest:passed' : 'rest:replaced';
+    exit;
+}
 if ( $argv[3] === 'rest' || $argv[3] === 'rest-prior' ) {
-    // rest-prior: another authenticator already decided; its answer must pass through.
+    // rest-prior: an earlier filter returned true, as WooCommerce does for every Store API
+    // request. That must not open the API to a visitor. rest-error: an earlier error passes.
+    if ( 99 !== $GLOBALS['prio']['rest_authentication_errors'] ) { echo 'rest:priority'; exit; }
     $r = $GLOBALS['hooks']['rest_authentication_errors']( $argv[3] === 'rest-prior' ? true : null );
     if ( true === $r ) { echo 'rest:prior'; exit; }
     echo $r instanceof WP_Error ? 'rest:' . $r->data['status'] : 'rest:open';
@@ -97,5 +107,7 @@ expect 99999999 0 front '503|Retry-After: 604800|page'  # clamped to 7 days
 expect 600   0 rest  'rest:503'
 expect 600   1 rest  'rest:open'
 expect -     0 rest  'rest:open'
-expect 600   0 rest-prior 'rest:prior'
+expect 600   0 rest-prior 'rest:503'
+expect 600   1 rest-prior 'rest:prior'
+expect 600   0 rest-error 'rest:passed'
 echo "PASS: wp-maintenance template closes the site to visitors only, command contract intact"

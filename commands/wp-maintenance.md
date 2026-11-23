@@ -1,5 +1,5 @@
 ---
-description: Turn maintenance mode on or off — a 503 page for visitors while editors keep working, or WooCommerce's coming-soon mode on a store
+description: Turn maintenance mode on or off — a 503 page for visitors while editors keep working, stores included
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 argument-hint: "on [--retry-after <seconds>] | off | status [--force]"
 ---
@@ -48,27 +48,22 @@ print the usage line and stop. `--retry-after <seconds>` applies to `on` only (d
 `3600`); the theme clamps it to between 60 seconds and 7 days. `--force` lets Step 4 replace
 an `inc/maintenance.php` that no longer matches the template.
 
-## Step 3: Store or theme
+## Step 3: Stores use the same switch
+
+A store gets the theme switch too. **Do not use WooCommerce's coming-soon mode for
+maintenance.** It answers `200` with no `Retry-After`, so crawlers index the notice; it lets
+through only `manage_woocommerce`, so an editor is locked out; and it leaves the REST and
+Store APIs open. It is launch state, owned by `/wp-woo-setup`, and this command never writes it.
+On a store, read it and report it beside the result:
 
 ```bash
-$WP plugin is-active woocommerce && echo store || echo theme
+$WP plugin is-active woocommerce && $WP option get woocommerce_coming_soon
 ```
 
-**On a store, use WooCommerce's own coming-soon mode and skip Step 4.** A second closed-site
-layer on top of WooCommerce's would mean two switches that can disagree, and `/wp-woo-setup`
-already treats coming-soon as launch state.
+The theme switch closes the Store API to anonymous requests along with the rest of REST, so
+no cart or checkout runs while the site is closed; shop managers can `edit_posts` and work through it.
 
-| Action | Commands |
-|---|---|
-| `on` | `$WP option update woocommerce_coming_soon yes` then `$WP option update woocommerce_store_pages_only no` (the whole site, not only the shop pages) |
-| `off` | `$WP option update woocommerce_coming_soon no` |
-| `status` | `$WP option get woocommerce_coming_soon` (absent reads as a live shop) |
-
-Turning it off on a store is a launch: say so in the report. A value written here no longer
-matches the hash `/wp-woo-setup` recorded, so a later `/wp-woo-setup` run treats it as the
-client's choice and leaves it alone, which is the intent. Then go to Step 6.
-
-## Step 4: Install the theme switch (theme sites, `on` only)
+## Step 4: Install the theme switch (`on` only)
 
 The PHP is not written by you. It is a fixed file,
 `${CLAUDE_PLUGIN_ROOT}/templates/maintenance/maintenance.php`, held to the PHP 7.4 floor.
@@ -109,10 +104,10 @@ if ( is_readable( $maintenance ) ) {
 ```
 
 If the theme loops over `inc/*.php`, it already loads the file: never load it twice.
-While the option is absent the file only registers two hooks that return at once, so
-installing it changes nothing a visitor sees.
+While the option is absent the file only registers two hooks that read one option and
+return, so installing it changes nothing a visitor sees.
 
-## Step 5: Switch (theme sites)
+## Step 5: Switch
 
 | Action | Command |
 |---|---|
@@ -131,11 +126,11 @@ URL=$($WP option get home)
 curl -sk -o /dev/null -D - "$URL/" | sed -n '1p;/^[Rr]etry-[Aa]fter/p'
 ```
 
-- Theme site, `on`: the status line must be `503` and `Retry-After` must be present. Anything
-  else is a failure: report it and do not say the site is closed.
-- Theme site, `off`: the status must not be `503`.
-- Store: report the `woocommerce_coming_soon` value and the status line as they are.
+- `on`: the status line must be `503` and `Retry-After` must be present. Anything else is a
+  failure: report it and do not say the site is closed.
+- `off`: the status must not be `503`. On a store whose `woocommerce_coming_soon` is `yes`,
+  say the shop is still in coming-soon mode: launching it is `/wp-woo-setup`'s step.
 
-Report the action, the mechanism (theme switch or WooCommerce coming-soon), the status line
+Report the action, the status line
 and, after `on`, that `/wp-audit` and `/wp-demo-verify` read a closed site as a `503` until it
 is turned off again.

@@ -4,8 +4,8 @@
  * Copied by /wp-maintenance. PHP 7.4 floor.
  *
  * The switch is one option, `__prefix___maintenance`. Absent means off; present, it holds
- * the Retry-After in seconds. Nothing here runs a query or changes markup while the option
- * is absent, so a theme that carries this file renders exactly as one that does not.
+ * the Retry-After in seconds. While the option is absent the hooks below read that one option
+ * and return, so a theme that carries this file renders exactly as one that does not.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -50,9 +50,12 @@ add_action( 'template_redirect', function () {
 }, 1 );
 
 // The REST API would otherwise serve every page's content to an anonymous request while
-// the front end says the site is closed.
+// the front end says the site is closed. A `true` from an earlier filter is not a reason to
+// let the request through: WooCommerce returns `true` for every Store API request, so honoring
+// it would leave cart and checkout open. Only an earlier error passes untouched. Priority 99
+// runs after plugins and before core's cookie check (100).
 add_filter( 'rest_authentication_errors', function ( $result ) {
-    if ( null !== $result || 0 === __prefix___maintenance_retry_after() || __prefix___maintenance_bypass() ) {
+    if ( is_wp_error( $result ) || 0 === __prefix___maintenance_retry_after() || __prefix___maintenance_bypass() ) {
         return $result;
     }
     return new WP_Error(
@@ -60,7 +63,7 @@ add_filter( 'rest_authentication_errors', function ( $result ) {
         __( 'The site is under maintenance.', '__textdomain__' ),
         array( 'status' => 503 )
     );
-} );
+}, 99 );
 
 /**
  * The page itself: the site's logo or name and one line of copy. It deliberately skips
