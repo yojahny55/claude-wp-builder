@@ -26,7 +26,8 @@ n=$(grep -cE "$cmd" "$s" || true)
 # WP-CLI 2.12), so every import that carried it failed outright. An import names its owner
 # with the global --user instead.
 create='(\$WP|\bwp) post create +[-'"'"'"<$./~[:alnum:]]'
-import='(\$WP|\bwp) media import +[-'"'"'"<$./~[:alnum:]]'
+# Any global flag may sit between the binary and the verb (`wp --path=X media import`).
+import='(\$\{?WP\}?|\bwp)( +--[a-z-]+(=[^ ]*)?)* +media import +[-'"'"'"<$./~[:alnum:]]'
 missing=$(grep -nE "$create" "$s" | grep -vF -- '--post_author=$AUTHOR' || true)
 [ -z "$missing" ] || fail "$s creates without --post_author=\$AUTHOR (user 0 owns it):"$'\n'"$missing"
 missing=$(grep -nE "$import" "$s" | grep -vF -- '--user=$AUTHOR' || true)
@@ -44,9 +45,9 @@ grep -qF "post_author = 0 AND post_status != 'auto-draft' AND post_type != 'nav_
 # Every other command, agent and skill that creates content the same way.
 missing=$(grep -rnE "$create" commands agents skills --include=*.md | grep -vF -- '--post_author=' || true)
 [ -z "$missing" ] || fail "a post create with no --post_author:"$'\n'"$missing"
-missing=$(grep -rnE "$import" commands agents skills --include=*.md | grep -vF -- '--user=' || true)
-[ -z "$missing" ] || fail "a media import with no --user:"$'\n'"$missing"
-bad=$(grep -rnE "$import" commands agents skills --include=*.md | grep -F -- '--post_author' || true)
+missing=$(grep -rnE "$import" commands agents skills bin --include=*.md --include=*.sh | grep -vE '^[^:]+:[0-9]+: *#' | grep -vE -- '--user=["$<]' || true)
+[ -z "$missing" ] || fail "a media import with no --user=<author>:"$'\n'"$missing"
+bad=$(grep -rnE "$import" commands agents skills bin --include=*.md --include=*.sh | grep -F -- '--post_author' || true)
 [ -z "$bad" ] || fail "a media import with --post_author, which WP-CLI refuses (the import fails):"$'\n'"$bad"
 
 # /wp-seed's polylang path hands untranslated pages to pll-import.php, whose new

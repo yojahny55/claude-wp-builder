@@ -156,9 +156,16 @@ if [[ -n "$SCENE" ]] && command -v wp >/dev/null && wp core is-installed --path=
   WP_PATH="$(cd "$THEME/../../.." && pwd)"
   info "Importing to Media Library at $WP_PATH"
   desktop_id=""; mobile_id=""; poster_id=""
-  [[ -f "$OUT_DESKTOP" ]] && desktop_id=$(wp --path="$WP_PATH" media import "$OUT_DESKTOP" --porcelain 2>/dev/null || true)
-  [[ -f "$OUT_MOBILE"  ]] && mobile_id=$(wp --path="$WP_PATH"  media import "$OUT_MOBILE"  --porcelain 2>/dev/null || true)
-  [[ -f "$OUT_POSTER"  ]] && poster_id=$(wp --path="$WP_PATH"  media import "$OUT_POSTER"  --porcelain 2>/dev/null || true)
+  # The attachments need an owner: without --user they belong to user 0 and fail
+  # /wp-finalize Check 7. `media import` refuses --post_author; --user is the flag.
+  AUTHOR=$(wp --path="$WP_PATH" user list --role=administrator --field=ID --number=1 2>/dev/null || true)
+  if [[ ! "$AUTHOR" =~ ^[0-9]+$ ]]; then
+    err "No administrator to own the imported media; skipping the import."
+    OUT_DESKTOP=""; OUT_MOBILE=""; OUT_POSTER=""
+  fi
+  [[ -f "$OUT_DESKTOP" ]] && desktop_id=$(wp --path="$WP_PATH" media import "$OUT_DESKTOP" --user="$AUTHOR" --porcelain 2>/dev/null || true)
+  [[ -f "$OUT_MOBILE"  ]] && mobile_id=$(wp --path="$WP_PATH"  media import "$OUT_MOBILE"  --user="$AUTHOR" --porcelain 2>/dev/null || true)
+  [[ -f "$OUT_POSTER"  ]] && poster_id=$(wp --path="$WP_PATH"  media import "$OUT_POSTER"  --user="$AUTHOR" --porcelain 2>/dev/null || true)
 
   # wp media import --porcelain prints an attachment ID; anything else (an error
   # line, stray output) must never reach the PHP below.
