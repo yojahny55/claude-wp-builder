@@ -87,6 +87,7 @@ if ( 'png' === $case ) { $src = $dir . '/alpha.png'; $type = 'image/png'; }
 if ( 'gif' === $case ) { $src = $dir . '/anim.gif'; $type = 'image/gif'; }
 if ( 'rotated' === $case ) { $src = $dir . '/rotated.jpg'; }
 if ( 'upright' === $case ) { $src = $dir . '/upright.jpg'; }
+if ( 'deep' === $case ) { $src = $dir . '/deep.jpg'; }
 if ( 'stream' === $case ) { $src = 'fx://bucket/uploads/2026/11/photo.jpg'; }
 $up = array( 'file' => $src, 'url' => 'https://example.test/wp-content/uploads/2026/11/' . basename( $src ), 'type' => $type );
 if ( 'error' === $case ) { $up['error'] = 'too big'; }
@@ -126,6 +127,10 @@ fresh() {
     };
     file_put_contents( "$d/rotated.jpg", "\xFF\xD8" . $app1( false, 6 ) . substr( $jpg, 2 ) );
     file_put_contents( "$d/upright.jpg", "\xFF\xD8" . $app1( true, 1 ) . substr( $jpg, 2 ) );
+    // Rotated, but its EXIF sits past the first 256 KiB, behind five full APP2 segments: the
+    // plugin cannot see it, so it must not convert.
+    $app2 = str_repeat( "\xFF\xE2" . pack( "n", 65535 ) . str_repeat( "x", 65533 ), 5 );
+    file_put_contents( "$d/deep.jpg", "\xFF\xD8" . $app2 . $app1( false, 6 ) . substr( $jpg, 2 ) );
   ' "$tmp/d"
 }
 expect() {
@@ -144,6 +149,7 @@ expect stream    ''    'image/webp|photo.webp|photo.webp|exists|orig-gone|real-w
 expect floor     ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'
 expect rotated   ''    'image/jpeg|rotated.jpg|rotated.jpg|exists|orig-intact'
 expect upright   ''    'image/webp|upright.webp|upright.webp|exists|orig-gone|real-webp'
+expect deep      ''    'image/jpeg|deep.jpg|deep.jpg|exists|orig-intact'
 expect cap       ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'
 expect timeout   ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'
 expect gif       ''    'image/gif|anim.gif|anim.gif|exists|orig-intact'

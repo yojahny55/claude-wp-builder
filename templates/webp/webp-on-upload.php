@@ -84,6 +84,8 @@ function webp_on_upload_encode( $src, $dst, $flags ) {
 	stream_set_blocking( $pipes[1], false );
 	stream_set_blocking( $pipes[2], false );
 	$deadline = microtime( true ) + (float) apply_filters( 'webp_on_upload_timeout', 30 );
+	$failed   = false;
+	$exit     = null;
 	$out      = '';
 	$open     = array( $pipes[1], $pipes[2] );
 	while ( $open ) {
@@ -96,6 +98,8 @@ function webp_on_upload_encode( $src, $dst, $flags ) {
 		$write  = null;
 		$except = null;
 		if ( false === stream_select( $read, $write, $except, (int) $left, 200000 ) ) {
+			proc_terminate( $proc, 9 );
+			$failed = true;
 			break;
 		}
 		foreach ( $read as $r ) {
@@ -109,10 +113,28 @@ function webp_on_upload_encode( $src, $dst, $flags ) {
 			$out .= $chunk;
 		}
 	}
-	$timed_out = microtime( true ) >= $deadline;
+	// Both pipes can close before the process exits. Wait for it within the same deadline,
+	// so proc_close() below never blocks on an encoder that is still running.
+	while ( ! $failed ) {
+		$status = proc_get_status( $proc );
+		if ( ! $status['running'] ) {
+			$exit = (int) $status['exitcode'];
+			break;
+		}
+		if ( microtime( true ) >= $deadline ) {
+			proc_terminate( $proc, 9 );
+			$failed = true;
+			break;
+		}
+		usleep( 20000 );
+	}
+	$timed_out = $failed || microtime( true ) >= $deadline;
 	fclose( $pipes[1] );
 	fclose( $pipes[2] );
 	$code = proc_close( $proc );
+	if ( null !== $exit ) {
+		$code = $exit; // proc_get_status() already reaped it; proc_close() then reports -1
+	}
 	if ( $timed_out || 0 !== $code || ! is_file( $dst ) || ! filesize( $dst ) ) {
 		@unlink( $dst );
 		return null;
@@ -161,11 +183,28 @@ function webp_on_upload_orientation( $src ) {
 	}
 	$pos = 2;
 	$len = strlen( $head );
-	while ( $pos + 4 <= $len && "\xFF" === $head[ $pos ] ) {
+	while ( $pos + 1 < $len ) {
+		if ( "\xFF" !== $head[ $pos ] ) {
+			return null; // not a marker where one must be: unreadable
+		}
 		$marker = ord( $head[ $pos + 1 ] );
-		$size   = unpack( 'n', substr( $head, $pos + 2, 2 ) )[1];
-		if ( 0xDA === $marker || $size < 2 ) {
-			return 1; // start of scan: no EXIF before the image data
+		if ( 0xFF === $marker ) {
+			$pos++; // fill byte
+			continue;
+		}
+		if ( 0x01 === $marker || ( $marker >= 0xD0 && $marker <= 0xD7 ) ) {
+			$pos += 2; // markers with no length
+			continue;
+		}
+		if ( 0xDA === $marker || 0xD9 === $marker ) {
+			return 1; // start of scan or end of image: no EXIF before the image data
+		}
+		if ( $pos + 4 > $len ) {
+			return null;
+		}
+		$size = unpack( 'n', substr( $head, $pos + 2, 2 ) )[1];
+		if ( $size < 2 ) {
+			return null;
 		}
 		if ( 0xE1 === $marker && "Exif\0\0" === substr( $head, $pos + 4, 6 ) ) {
 			$tiff = substr( $head, $pos + 10, $size - 8 );
@@ -201,7 +240,7 @@ function webp_on_upload_orientation( $src ) {
 		}
 		$pos += 2 + $size;
 	}
-	return 1;
+	return null; // ran out of the bytes read without reaching the image data: cannot tell
 }
 
 /**
