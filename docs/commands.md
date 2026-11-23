@@ -355,6 +355,7 @@ coming-soon mode is launch state and is reported, never written. Verified with a
 
 ```
 /wp-webp upload on | upload off | upload status [--force]
+/wp-webp migrate
 ```
 
 Installs `templates/webp/webp-on-upload.php` as a must-use plugin. On `wp_handle_upload` and
@@ -366,6 +367,13 @@ qualifies the original is kept, and so is a JPEG whose EXIF says it is rotated, 
 `cwebp`, `proc_open` or a WebP-capable image editor it does nothing; `status` names which.
 Existing images are not touched. A copy that no longer matches the template is left alone
 unless `--force`. Verified with a real `wp media import`.
+
+`migrate` converts a PNG library already on disk, through `skills/wp-robin/scripts/webp-migrate.php`:
+backup (database and uploads), `convert` each PNG attachment to a WebP original with WebP sizes
+and an old-to-new file map, `replace` every reference in the database (serialized and
+JSON-escaped values included, `guid`, transients and Robin's queue left alone), `verify` the
+files and the database, a served-HTML check, the redirect rule printed for the operator, and
+`move-aside` of the old files to a folder outside uploads. Nothing is deleted.
 
 ### `/wp-seed`
 

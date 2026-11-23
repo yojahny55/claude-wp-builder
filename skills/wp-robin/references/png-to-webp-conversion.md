@@ -40,6 +40,10 @@ images on the sampled templates at 1440 and 390 px.
 
 ## Procedure
 
+`/wp-webp migrate` runs steps 3, 4, 5 (the database half), 7 and the checks of each through
+`scripts/webp-migrate.php`; the steps below are what it does and why. Read them before the first
+run, and use *Traps* when a run stops halfway.
+
 1. **Back up the database.** Back up again before the URL replacement in step 4. On production
    (the direct path in *Production order*), also back up the uploads directory.
 2. **Turn off Robin's auto-optimisation for the run** (`wbcr_io_auto_optimize_when_upload`
