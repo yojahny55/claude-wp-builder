@@ -2,7 +2,8 @@
 # /wp-webp upload installs templates/webp/webp-on-upload.php, a must-use plugin that swaps a
 # PNG or JPEG upload for a WebP before WordPress makes its sizes. This runs the plugin's filter
 # with the real cwebp against stubbed WordPress: a photo becomes a WebP and the original is
-# gone; a candidate that misses the PSNR floor or is not smaller keeps the original untouched;
+# gone; a candidate that misses the PSNR floor or is not smaller, a JPEG whose EXIF says it is
+# rotated, an image over the pixel cap and an encode past its deadline keep the original;
 # GIFs, failed uploads and every blocker (no cwebp, no WebP editor, the disable constant) leave
 # the upload alone; a name clash gets a unique name; an s3://-style stream wrapper works
 # through a local copy. Against a real WordPress: tests/checks/webp-on-upload-integration.sh.
@@ -48,6 +49,8 @@ $GLOBALS['filters'] = array();
 function add_filter( $h, $f, $p = 10 ) { $GLOBALS['filters'][ $h ] = array( $f, $p ); }
 function apply_filters( $h, $v ) {
     if ( 'webp_on_upload_psnr' === $h && 'floor' === $GLOBALS['case'] ) { return 99.5; }
+    if ( 'webp_on_upload_max_pixels' === $h && 'cap' === $GLOBALS['case'] ) { return 1000; }
+    if ( 'webp_on_upload_timeout' === $h && 'timeout' === $GLOBALS['case'] ) { return 0.0001; }
     return $v;
 }
 function wp_image_editor_supports( $a ) { return 'no-editor' !== $GLOBALS['case']; }
@@ -82,6 +85,8 @@ if ( 5 !== $prio || ! isset( $GLOBALS['filters']['wp_handle_sideload'] ) ) { ech
 $src = $dir . '/photo.jpg'; $type = 'image/jpeg';
 if ( 'png' === $case ) { $src = $dir . '/alpha.png'; $type = 'image/png'; }
 if ( 'gif' === $case ) { $src = $dir . '/anim.gif'; $type = 'image/gif'; }
+if ( 'rotated' === $case ) { $src = $dir . '/rotated.jpg'; }
+if ( 'upright' === $case ) { $src = $dir . '/upright.jpg'; }
 if ( 'stream' === $case ) { $src = 'fx://bucket/uploads/2026/11/photo.jpg'; }
 $up = array( 'file' => $src, 'url' => 'https://example.test/wp-content/uploads/2026/11/' . basename( $src ), 'type' => $type );
 if ( 'error' === $case ) { $up['error'] = 'too big'; }
@@ -110,6 +115,17 @@ fresh() {
     for ( $x = 0; $x < 320; $x++ ) { imagefilledrectangle( $a, $x, 0, $x, 239, imagecolorallocatealpha( $a, 200, (int) ( 255 * $x / 320 ), 60, (int) ( 127 * $x / 320 ) ) ); }
     imagepng( $a, "$d/alpha.png" );
     $g = imagecreate( 10, 10 ); imagecolorallocate( $g, 1, 2, 3 ); imagegif( $g, "$d/anim.gif" );
+    // EXIF Orientation in an APP1 segment right after SOI: big-endian 6 (rotated), little-endian 1.
+    $jpg = file_get_contents( "$d/photo.jpg" );
+    $app1 = function ( $le, $orientation ) {
+      $p16 = function ( $v ) use ( $le ) { return pack( $le ? "v" : "n", $v ); };
+      $p32 = function ( $v ) use ( $le ) { return pack( $le ? "V" : "N", $v ); };
+      $tiff = ( $le ? "II" : "MM" ) . $p16( 42 ) . $p32( 8 ) . $p16( 1 ) . $p16( 0x0112 ) . $p16( 3 ) . $p32( 1 ) . $p16( $orientation ) . $p16( 0 ) . $p32( 0 );
+      $body = "Exif\0\0" . $tiff;
+      return "\xFF\xE1" . pack( "n", strlen( $body ) + 2 ) . $body;
+    };
+    file_put_contents( "$d/rotated.jpg", "\xFF\xD8" . $app1( false, 6 ) . substr( $jpg, 2 ) );
+    file_put_contents( "$d/upright.jpg", "\xFF\xD8" . $app1( true, 1 ) . substr( $jpg, 2 ) );
   ' "$tmp/d"
 }
 expect() {
@@ -126,6 +142,10 @@ expect photo     clash 'image/webp|photo-1.webp|photo-1.webp|exists|orig-gone|re
 expect png       ''    'image/webp|alpha.webp|alpha.webp|exists|orig-gone|real-webp'
 expect stream    ''    'image/webp|photo.webp|photo.webp|exists|orig-gone|real-webp'
 expect floor     ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'
+expect rotated   ''    'image/jpeg|rotated.jpg|rotated.jpg|exists|orig-intact'
+expect upright   ''    'image/webp|upright.webp|upright.webp|exists|orig-gone|real-webp'
+expect cap       ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'
+expect timeout   ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'
 expect gif       ''    'image/gif|anim.gif|anim.gif|exists|orig-intact'
 expect error     ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'
 expect no-cwebp  ''    'image/jpeg|photo.jpg|photo.jpg|exists|orig-intact'

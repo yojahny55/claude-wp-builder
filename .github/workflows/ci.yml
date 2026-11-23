@@ -64,15 +64,15 @@ jobs:
           node --version
           php --version | head -1
 
-      # docker-nginx-config.sh serves the Docker nginx template from the image the compose
-      # file names and never pulls it itself (a check must not reach the network on a
-      # developer's machine). The runner has Docker; the image is fetched here, once, so the
-      # check runs instead of failing under CHECKS_REQUIRE_TOOLS.
       # cwebp is what templates/webp/webp-on-upload.php encodes with; the checks run the real
       # binary rather than a stub of it. It is not on the runner image.
       - name: Install cwebp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends webp && cwebp -version
 
+      # docker-nginx-config.sh serves the Docker nginx template from the image the compose
+      # file names and never pulls it itself (a check must not reach the network on a
+      # developer's machine). The runner has Docker; the image is fetched here, once, so the
+      # check runs instead of failing under CHECKS_REQUIRE_TOOLS.
       - name: Fetch the nginx image the Docker template runs in
         run: docker pull --quiet nginx:alpine
 
@@ -291,6 +291,11 @@ jobs:
           chmod +x /usr/local/bin/wp
           wp --info --allow-root
 
+      # cwebp is what templates/webp/webp-on-upload.php encodes with; the checks run the real
+      # binary rather than a stub of it. It is not on the runner image.
+      - name: Install cwebp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends webp && cwebp -version
+
       # This job reaches the network on purpose, and it is the only one that does: a
       # WordPress fixture cannot exist without downloading a WordPress. Everything it
       # installs is pinned in the provisioner, and every assertion runs against the local
@@ -300,11 +305,6 @@ jobs:
       # /usr/bin/bash -e {0}` -- so a failing check aborts the step and the later ones never
       # start. No explicit guard is needed between them, and the note is here because the
       # absence of one reads like an oversight.
-      # cwebp is what templates/webp/webp-on-upload.php encodes with; the checks run the real
-      # binary rather than a stub of it. It is not on the runner image.
-      - name: Install cwebp
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends webp && cwebp -version
-
       - name: WordPress fixture checks
         env:
           WP_FIXTURE: "1"

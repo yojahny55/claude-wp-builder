@@ -58,6 +58,19 @@ $WP eval 'echo WPMU_PLUGIN_DIR;'
 The file is `<mu-dir>/webp-on-upload.php`. It is a must-use plugin, not a theme file: it works the
 same whatever theme is active, and a theme switch cannot turn it off.
 
+That path is the one PHP sees. With a container wrapper (docker compose, DDEV, Lando, wp-env) it
+is a path inside the container, not on this machine. Every file step below runs on this
+machine, so resolve `<mu-dir>` here first:
+
+- the printed path exists here (`test -d "$(dirname '<mu-dir>')"`): use it;
+- it does not, and it ends in `/wp-content/mu-plugins`: use the WordPress root on this machine
+  (`wp_cli.path` from the manifest, or the project root that holds `wp-config.php`) followed
+  by `/wp-content/mu-plugins`, and check that its parent `wp-content` exists;
+- neither: stop and ask the operator where the site's `wp-content` is on this machine. Never
+  create a directory you could not place.
+
+Step 6 then proves that WordPress loads the file from where it was put.
+
 ## Step 4: `upload on`
 
 The PHP is not written by you. It is a fixed file,
@@ -79,8 +92,9 @@ Then go to Step 6.
 
 ## Step 5: `upload off`
 
-Remove `<mu-dir>/webp-on-upload.php` when it is identical to the template, or when `--force` is
-given; a different copy without `--force`: stop and show the diff. Images already converted stay
+No `<mu-dir>/webp-on-upload.php`: say the plugin is not installed and stop. Otherwise remove it
+when it is identical to the template, or when `--force` is given; a different copy without
+`--force`: stop and show the diff. Images already converted stay
 WebP: removing the plugin only stops new conversions. To pause it without removing the file,
 `WEBP_ON_UPLOAD_DISABLE` can be defined as `true` in `wp-config.php` instead.
 
@@ -99,9 +113,11 @@ $WP eval 'if ( ! function_exists( "webp_on_upload_blocker" ) ) { echo "not loade
 | `inactive: proc_open is disabled` | the host forbids running programs from PHP; the plugin cannot work there |
 | `inactive: no image editor can write WebP sizes` | GD or Imagick lacks WebP; converting would leave the image with no sizes, so it does not |
 | `inactive: disabled by WEBP_ON_UPLOAD_DISABLE` | paused in `wp-config.php` |
-| `not loaded` | after `on`, a failure: the file is not in the must-use directory WordPress reads |
+| `not loaded` | after `off`, the expected result. After `on` or on `status`, the file is not in the must-use directory WordPress reads: after `on` that is a failure |
 
-After `on`, prove it on a real upload, then remove the test attachment:
+Only after `on`, and only when the status line says `ready`, prove it on a real upload, then
+remove the test attachment. On any `inactive:` line, report the reason and skip the probe:
+the upload would stay a JPEG by design, and that is not a failure.
 
 ```bash
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT

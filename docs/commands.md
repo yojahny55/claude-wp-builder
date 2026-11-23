@@ -361,7 +361,8 @@ Installs `templates/webp/webp-on-upload.php` as a must-use plugin. On `wp_handle
 `wp_handle_sideload` at priority 5 it encodes a PNG or JPEG with `cwebp` up a quality ladder,
 keeps the first candidate that reaches 40 dB PSNR and is smaller than the original, and swaps
 the upload for it before WordPress makes the sizes, so every size is WebP. When no candidate
-qualifies the original is kept. `s3://` uploads go through a local temporary copy. Without
+qualifies the original is kept, and so is a JPEG whose EXIF says it is rotated, an image over
+40 megapixels, or one whose encode passes 30 seconds. `s3://` uploads go through a local temporary copy. Without
 `cwebp`, `proc_open` or a WebP-capable image editor it does nothing; `status` names which.
 Existing images are not touched. A copy that no longer matches the template is left alone
 unless `--force`. Verified with a real `wp media import`.

@@ -18,6 +18,9 @@
  * Stream wrappers (S3 Uploads' `s3://`) are handled by copying to a local temporary file,
  * because `cwebp` reads and writes only real paths, and copying the result back.
  *
+ * A JPEG whose EXIF says it is rotated is kept as it is (WebP would lose the tag and the sizes
+ * would come out sideways), and so is a JPEG whose EXIF cannot be parsed. Images over 40 megapixels are kept, and each encode is killed after 30 seconds.
+ *
  * Without `cwebp`, without `proc_open`, or without an image editor that can write WebP sizes,
  * it does nothing and the upload goes through as before. Define WEBP_ON_UPLOAD_DISABLE as true
  * to switch it off without removing the file.
@@ -62,6 +65,10 @@ function webp_on_upload_blocker() {
 /**
  * Run cwebp once. Returns the PSNR (Total, dB) it reports, or null on failure.
  *
+ * The command is an argument array, so no shell parses it (PHP 7.4 takes an array). Output
+ * is read without blocking until the process exits or the deadline passes; at the deadline
+ * the encoder is killed and the candidate fails, so a huge image cannot hang the upload.
+ *
  * @param string   $src   local source path
  * @param string   $dst   local destination path
  * @param string[] $flags encoder flags
@@ -69,19 +76,132 @@ function webp_on_upload_blocker() {
  */
 function webp_on_upload_encode( $src, $dst, $flags ) {
 	$cmd   = array_merge( array( webp_on_upload_cwebp() ), $flags, array( '-mt', '-print_psnr', $src, '-o', $dst ) );
-	$line  = implode( ' ', array_map( 'escapeshellarg', $cmd ) );
 	$pipes = array();
-	$proc  = proc_open( $line, array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
+	$proc  = proc_open( $cmd, array( 0 => array( 'file', '/dev/null', 'r' ), 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
 	if ( ! is_resource( $proc ) ) {
 		return null;
 	}
-	$out = stream_get_contents( $pipes[1] ) . stream_get_contents( $pipes[2] );
+	stream_set_blocking( $pipes[1], false );
+	stream_set_blocking( $pipes[2], false );
+	$deadline = microtime( true ) + (float) apply_filters( 'webp_on_upload_timeout', 30 );
+	$out      = '';
+	$open     = array( $pipes[1], $pipes[2] );
+	while ( $open ) {
+		$left = $deadline - microtime( true );
+		if ( $left <= 0 ) {
+			proc_terminate( $proc, 9 );
+			break;
+		}
+		$read   = $open;
+		$write  = null;
+		$except = null;
+		if ( false === stream_select( $read, $write, $except, (int) $left, 200000 ) ) {
+			break;
+		}
+		foreach ( $read as $r ) {
+			$chunk = fread( $r, 8192 );
+			if ( false === $chunk || ( '' === $chunk && feof( $r ) ) ) {
+				$open = array_filter( $open, function ( $o ) use ( $r ) {
+					return $o !== $r;
+				} );
+				continue;
+			}
+			$out .= $chunk;
+		}
+	}
+	$timed_out = microtime( true ) >= $deadline;
 	fclose( $pipes[1] );
 	fclose( $pipes[2] );
-	if ( 0 !== proc_close( $proc ) || ! is_file( $dst ) || ! filesize( $dst ) ) {
+	$code = proc_close( $proc );
+	if ( $timed_out || 0 !== $code || ! is_file( $dst ) || ! filesize( $dst ) ) {
+		@unlink( $dst );
 		return null;
 	}
 	return preg_match( '/Total:\s*([0-9.]+)/', $out, $m ) ? (float) $m[1] : null;
+}
+
+/**
+ * Whether a local file is one this plugin should not touch: a JPEG whose EXIF says it is
+ * rotated (cwebp would drop the tag, and WordPress rotates sizes from it, so the WebP would
+ * come out sideways), a JPEG whose EXIF cannot be parsed, or an image over the pixel cap.
+ *
+ * @param string $src  local source path
+ * @param string $mime image/png or image/jpeg
+ * @return bool
+ */
+function webp_on_upload_skip( $src, $mime ) {
+	$info = @getimagesize( $src );
+	if ( ! $info ) {
+		return true;
+	}
+	$cap = (int) apply_filters( 'webp_on_upload_max_pixels', 40000000 );
+	if ( $cap > 0 && $info[0] * $info[1] > $cap ) {
+		return true;
+	}
+	if ( 'image/jpeg' === $mime ) {
+		$orientation = webp_on_upload_orientation( $src );
+		if ( null === $orientation || $orientation > 1 ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * The EXIF Orientation of a JPEG: 1 when it has none, null when its EXIF cannot be parsed.
+ * Read from the APP1 segment directly, so it does not depend on PHP's exif extension.
+ *
+ * @param string $src local JPEG path
+ * @return int|null
+ */
+function webp_on_upload_orientation( $src ) {
+	$head = @file_get_contents( $src, false, null, 0, 262144 );
+	if ( ! is_string( $head ) || "\xFF\xD8" !== substr( $head, 0, 2 ) ) {
+		return null;
+	}
+	$pos = 2;
+	$len = strlen( $head );
+	while ( $pos + 4 <= $len && "\xFF" === $head[ $pos ] ) {
+		$marker = ord( $head[ $pos + 1 ] );
+		$size   = unpack( 'n', substr( $head, $pos + 2, 2 ) )[1];
+		if ( 0xDA === $marker || $size < 2 ) {
+			return 1; // start of scan: no EXIF before the image data
+		}
+		if ( 0xE1 === $marker && "Exif\0\0" === substr( $head, $pos + 4, 6 ) ) {
+			$tiff = substr( $head, $pos + 10, $size - 8 );
+			$le   = 'II' === substr( $tiff, 0, 2 );
+			if ( ! $le && 'MM' !== substr( $tiff, 0, 2 ) ) {
+				return null;
+			}
+			$u16 = function ( $at ) use ( $tiff, $le ) {
+				$b = substr( $tiff, $at, 2 );
+				return 2 === strlen( $b ) ? unpack( $le ? 'v' : 'n', $b )[1] : null;
+			};
+			$u32 = function ( $at ) use ( $tiff, $le ) {
+				$b = substr( $tiff, $at, 4 );
+				return 4 === strlen( $b ) ? unpack( $le ? 'V' : 'N', $b )[1] : null;
+			};
+			$ifd   = $u32( 4 );
+			$count = null === $ifd ? null : $u16( $ifd );
+			if ( null === $count ) {
+				return null;
+			}
+			for ( $i = 0; $i < $count; $i++ ) {
+				$entry = $ifd + 2 + 12 * $i;
+				$tag   = $u16( $entry );
+				if ( null === $tag ) {
+					return null;
+				}
+				if ( 0x0112 === $tag ) {
+					$value = $u16( $entry + 8 );
+					return null === $value ? null : (int) $value;
+				}
+			}
+			return 1;
+		}
+		$pos += 2 + $size;
+	}
+	return 1;
 }
 
 /**
@@ -96,6 +216,9 @@ function webp_on_upload_encode( $src, $dst, $flags ) {
 function webp_on_upload_choose( $src, $mime ) {
 	$threshold = (float) apply_filters( 'webp_on_upload_psnr', 40.0 );
 	$ladder    = (array) apply_filters( 'webp_on_upload_qualities', array( 75, 82, 90 ) );
+	if ( webp_on_upload_skip( $src, $mime ) ) {
+		return null;
+	}
 	$limit     = (int) filesize( $src );
 	$tmp       = tempnam( sys_get_temp_dir(), 'webp' );
 	if ( false === $tmp ) {
