@@ -19,7 +19,7 @@
  *
  * Without --order it writes nothing to the store: a cart session the Store API opens is deleted.
  * --url replaces the site's home URL (a `wp server` port, a host the machine resolves another
- * way). A local site's certificate is not verified; any other site's is.
+ * way); with --order it must be the home URL's host or loopback, the site WP-CLI cleans up on. A local site's certificate is not verified; any other site's is.
  *
  * Every line is `<status> <check>[: detail]`, status pass, fail, skip or note; the last line is
  * `verify: N passed, N failed, N skipped`.
@@ -119,6 +119,11 @@ if (order) {
   if (!local) refuse.push(`the site reads as ${facts.environment}, not local`);
   if (!sells) refuse.push('a catalog sells nothing');
   if (!facts.cod) refuse.push('cash on delivery is off (setup turns it on only on a local site)');
+  // The order goes to the URL; the clean-up runs through WP-CLI. Both must be the same site.
+  const target = new URL(baseUrl || facts.home).hostname;
+  if (![new URL(facts.home).hostname, 'localhost', '127.0.0.1', '[::1]', '::1'].includes(target)) {
+    refuse.push(`--url points at ${target}, not this WordPress (${new URL(facts.home).hostname}) or loopback: the order would land where WP-CLI cannot delete it`);
+  }
   if (facts.orders > 0) refuse.push(`the store has ${facts.orders} order(s): a store with orders is a merchant's, and the new-order email would reach them`);
   if (refuse.length) {
     process.stdout.write(`refused: --order places an order only on a local store that sells and has none -- ${refuse.join('; ')}\n`);

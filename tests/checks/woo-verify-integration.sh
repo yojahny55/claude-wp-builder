@@ -146,6 +146,8 @@ has "$got" "refused: --order places an order only on a local store that sells an
 case "$(last "$got")" in "refused: "*" | 1") ;; *) fail "--order beside another order: $got" ;; esac
 [ "$(orders)" = 1 ] || fail "a refused --order changed the store's orders"
 q "wc_get_order( $CLIENT )->delete( true );"
+got=$(node bin/woo-verify.mjs "$PROJ" --url "http://shop.example.test/" --order 2>&1 || true)
+has "$got" 'refused: --order places an order only on a local store that sells and has none -- --url points at shop.example.test'
 $WP config set WP_ENVIRONMENT_TYPE staging --type=constant --quiet
 got=$(verify --order)
 has "$got" 'refused: --order places an order only on a local store that sells and has none -- the site reads as staging, not local'

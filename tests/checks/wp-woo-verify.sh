@@ -23,13 +23,14 @@ need_token "$cmd" "bash -c 'node \"\$1/bin/woo-verify.mjs\" \"\$2\"' _ \"\${CLAU
 need_token "$cmd" 'No `store` block: stop'
 need_token "$cmd" 'Anything but `native`: stop'
 need_token "$cmd" '`--order` is refused, before anything runs and with nothing written, unless the site is
-local, the tier sells, cash on delivery is on, and the store has no other order.'
+local, the tier sells, cash on delivery is on, and the store has no other order — and with'
 need_token "$cmd" 'WooCommerce sends the order'"'"'s
 emails for real'
 need_token "$cmd" '| `2` | could not measure: WP-CLI or the site did not answer |'
 
 # The tool: refused before anything runs; nothing left behind; drift is setup's would-set.
 need_token "$tool" "if (!local) refuse.push(\`the site reads as \${facts.environment}, not local\`);"
+need_token "$tool" "not this WordPress (\${new URL(facts.home).hostname}) or loopback"
 need_token "$tool" "if (facts.orders > 0) refuse.push("
 need_token "$tool" "const drift = planLines.filter((l) => l.startsWith('would-set '));"
 need_token "$tool" "const r = helper('forget-session', key);"

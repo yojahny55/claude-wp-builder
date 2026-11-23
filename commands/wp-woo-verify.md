@@ -70,7 +70,8 @@ and that the order is deleted afterwards.
 A coming-soon store skips the page and shop checks: visitors see the coming-soon page.
 
 `--order` is refused, before anything runs and with nothing written, unless the site is
-local, the tier sells, cash on delivery is on, and the store has no other order. An order a
+local, the tier sells, cash on delivery is on, and the store has no other order — and with
+`--url`, only when it names the home URL's host or loopback, the site WP-CLI cleans up on. An order a
 stopped run left behind (billed to `woo-verify@example.test`, placed through the Store API) is
 removed by the next `--order` run.
 
