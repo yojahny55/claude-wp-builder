@@ -13,6 +13,8 @@ require_tool node python3
 tool=${EXPORT_PLATFORM:-bin/export-platform.mjs}
 root=$(pwd)
 tmp=$(mktemp -d)
+# Compare against the tree as it was before the exporter ran, so uncommitted edits do not fail it.
+before=$(git diff -- commands agents skills | sha256sum)
 trap 'rm -rf "$tmp"' EXIT
 
 ncmd=$(find commands -maxdepth 1 -name '*.md' | wc -l)
@@ -81,7 +83,7 @@ assert v == 'a\x7fb � c\x85 "q" \\ d', repr(v)
 PY
 
 # Nothing in the plugin changed.
-git diff --quiet -- commands agents skills || fail "export-platform changed a plugin file"
+[ "$(git diff -- commands agents skills | sha256sum)" = "$before" ] || fail "export-platform changed a plugin file"
 
 # Exit codes.
 rc=0; node "$tool" "$tmp/x" >/dev/null 2>&1 || rc=$?
