@@ -136,9 +136,12 @@ fresh() {
 expect() {
   fresh
   [ "${2:-}" = clash ] && : > "$tmp/d/photo.webp"
-  got=$(php "$tmp/run.php" "$1" "$tmp/d" "$CWEBP")
+  rm -rf "$tmp/systmp"; mkdir "$tmp/systmp"
+  got=$(TMPDIR="$tmp/systmp" php "$tmp/run.php" "$1" "$tmp/d" "$CWEBP")
   [ "$got" = "$3" ] || fail "case $1${2:+ ($2)}: expected '$3', got '$got'"
-  stray=$(find "$(dirname "$(mktemp -u)")" -maxdepth 1 -newer "$tmp/run.php" -name 'webp*' 2>/dev/null | sed -n 1,5p)
+  # The plugin's temporary files go to sys_get_temp_dir(), which PHP takes from TMPDIR: a
+  # private one per case, so a parallel check cleaning the shared /tmp cannot make find fail.
+  stray=$(find "$tmp/systmp" -name 'webp*' | sed -n 1,5p)
   [ -z "$stray" ] || fail "case $1 left temporary files behind: $stray"
 }
 
