@@ -450,6 +450,7 @@ Full arguments, inputs and outputs per command: **[docs/commands.md](docs/comman
 | `/wp-init` | all | required | Scaffold theme, record template / fields plugin / i18n choices |
 | `/wp-context [docs]` | all | auto | Scope + constraints from `docs/` |
 | `/wp-woo-setup [project-path] [--force]` | all | store profiles | Record the store — tier, address, currency, shipping, tax, Stripe in test mode — and bring WooCommerce in line with it; shows a dry run, re-runnable |
+| `/wp-woo-verify [project-path] [--order]` | all | store profiles | Check the store from outside — setup has nothing to change, the pages answer, the shop lists products, a cart works; `--order` places a test order on a local store and deletes it |
 | `/wp-yolo <folder>` | A | required | Whole demo folder → theme, seeded and verified |
 | `/wp-demo [brief\|iterate]` | all | demo stage | Generate `demo/index.html` from a brief (after `/wp-init`) |
 | `/wp-polish [path]` | all | demo stage | Normalize any HTML you already have into a demo |

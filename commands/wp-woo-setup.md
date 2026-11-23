@@ -323,4 +323,5 @@ falls back to neutral greys there until the `Section: Store demo` of `store.css`
 | `note` | information only |
 
 Next: build the theme and the store pages, then seed products. Every later store command reads
-the `store` block instead of asking again.
+the `store` block instead of asking again. Once there are products, `/wp-woo-verify` checks it from outside, and
+`/wp-woo-verify --order` places a test order on a local store and deletes it.

@@ -96,7 +96,7 @@ jobs:
           # branch, which this job does not fetch, so it lives in doc-sync below where the
           # base is already there -- here it would take its own skip path and pass while
           # checking nothing.
-          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh tests/checks/legal-pages-integration.sh tests/checks/webp-on-upload-integration.sh tests/checks/theme-screenshot.sh tests/checks/section-diff.sh tests/checks/webp-migrate-integration.sh tests/checks/store-enquiry-integration.sh tests/checks/store-theme-integration.sh tests/checks/store-links-integration.sh tests/checks/product-seed-integration.sh'
+          skip_here='tests/checks/motion-devices.sh tests/checks/wp-polylang-integration.sh tests/checks/wp-cf7-delivery.sh tests/checks/audit-resolve-links-integration.sh tests/checks/audit-ux-probe.sh tests/checks/visual-baselines.sh tests/checks/baseline-approval.sh tests/checks/wp-woo-setup-integration.sh tests/checks/legal-pages-integration.sh tests/checks/webp-on-upload-integration.sh tests/checks/theme-screenshot.sh tests/checks/section-diff.sh tests/checks/webp-migrate-integration.sh tests/checks/store-enquiry-integration.sh tests/checks/store-theme-integration.sh tests/checks/store-links-integration.sh tests/checks/product-seed-integration.sh tests/checks/woo-verify-integration.sh'
           bash tests/run.sh -j 4 --exclude "$skip_here"
 
   syntax:
@@ -338,6 +338,7 @@ jobs:
           bash tests/checks/store-theme-integration.sh
           bash tests/checks/store-links-integration.sh
           bash tests/checks/product-seed-integration.sh
+          bash tests/checks/woo-verify-integration.sh
           echo "::endgroup::"
 
   browser:

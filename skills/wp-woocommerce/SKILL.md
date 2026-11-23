@@ -41,7 +41,9 @@ show are the manifest's `products[]`, created by `/wp-seed --products` with
 `scripts/product-lib.php`, which `tests/checks/product-seed.sh` runs under bare PHP; neither is
 run by hand): simple or External products, resolved by sku and owned field by
 field like everything else `/wp-seed` writes; options (size, colour) leave a draft for review,
-because variations are not built.
+because variations are not built. `/wp-woo-verify` checks the result from outside with
+`bin/woo-verify.mjs`, which calls `scripts/woo-verify.php` for the store's facts and, with
+`--order`, to cancel and delete its own test order on a local site; neither is run by hand.
 
 When a client will never sell online, a product custom post type from `/wp-cpt` is lighter
 than any tier: no sessions, no Action Scheduler, no Store API. The catalog tier is for the
