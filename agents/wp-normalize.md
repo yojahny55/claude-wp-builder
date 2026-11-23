@@ -188,7 +188,9 @@ custom-post-type → the teaser block's section `kind: "cpt-teaser"`, plus a
   table with totals, billing fields, a login or orders panel). A marketing page with a few
   product cards is not a store page. Below `confidence` 0.8, keep `role: 'inner'` and add a
   `review[]` entry naming the page and the surface it might be. Every `product` page found
-  is listed, none is turned into seed data: product seeding is its own step.
+  is listed, none is turned into seed data: product seeding is its own step. A translated
+  store page (`es/tienda.html`) is `role: 'store'` too: WooCommerce has one page per surface
+  until the Polylang bridge exists.
 - Detail pages like `team/john.html` → **seed data** for single posts, not templates —
   each becomes one entry in that content type's `seed[]`, not a page.
 - The home "Team" block (the teaser) → a **query section**, i.e. `kind: 'cpt-teaser'` in

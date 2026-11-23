@@ -278,9 +278,9 @@ Server setup, permissions, and WordPress configuration.
   ([check](tests/checks/store-enquiry.sh), [on a real store](tests/checks/store-enquiry-integration.sh)). Piece 3 has its first half: a demo's store pages are `role: store`
   with their WooCommerce surface in the [`/wp-yolo`](commands/wp-yolo.md) manifest
   ([wp-normalize](agents/wp-normalize.md)), so no WP Page or section build collides with
-  WooCommerce's own pages, and the demo nav's links to them point at WooCommerce's
-  ([check](tests/checks/store-demo-pages.sh)); styling those pages from the demo is still to
-  come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
+  WooCommerce's own pages, and every demo link to them is reported for review
+  ([check](tests/checks/store-demo-pages.sh)); styling those pages from the demo and rewiring
+  their links are still to come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`

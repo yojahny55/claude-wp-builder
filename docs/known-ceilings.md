@@ -455,6 +455,12 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   per-IP row as the checkout limit, and ordinary cart traffic created that row first in the
   measurement, so six checkout attempts in a row went through. Setup turns on only the checkout
   limit; `tests/checks/store-kit.sh` fails if anything enables the general one.
+- **A demo's links to its store pages are not rewired.** `/wp-yolo` builds no WP Page for a
+  `role: store` page, so a nav item or button pointing at `shop.html` has no page to resolve to.
+  It lists each such link under Review instead of adding a menu item: a correct one depends on
+  the menu per language, its position in the demo nav and an idempotent re-seed, which belong
+  with the styling of the store pages (N01 piece 3, second half). Under Polylang every
+  language's link goes to WooCommerce's single page until the Polylang bridge.
 - **Setup ownership is by value hash.** A client edit that happens to restore setup's own value
   reads as setup's, and the hash records a value, not a history.
 - **Setup reports what the block stopped naming, and never deletes it.** A zone, shipping method
