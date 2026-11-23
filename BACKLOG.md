@@ -290,7 +290,11 @@ Server setup, permissions, and WordPress configuration.
   ([check](tests/checks/store-demo-layer.sh)), and so is the header cart link: Step 6.6 also
   installs [a fixed template part](templates/store/store-cart.php) that `/wp-header` calls on a
   `store` or `full` store, with the server's count refreshed from the Store API on WooCommerce's
-  cart events ([check](tests/checks/store-cart.sh)). Rewiring the demo's links is still to come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
+  cart events ([check](tests/checks/store-cart.sh)); and the demo's links to its store pages
+  are rewired: `/wp-seed --store-pages` adds menu items and fills link fields with
+  [WooCommerce's own pages](skills/wp-woocommerce/scripts/store-links.php)
+  ([check](tests/checks/store-links.sh), [on a real store](tests/checks/store-links-integration.sh)).
+  Piece 3 is delivered. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`

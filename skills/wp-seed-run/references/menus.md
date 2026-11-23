@@ -130,6 +130,30 @@ bash -c "$WP menu item add-post primary-es <services_id> --title='Servicios'"
 bash -c "$WP menu item add-post primary-es <contact_id> --title='Contacto'"
 ```
 
+### Links to the demo's store pages
+
+A demo nav link whose target is one of the `--store-pages` slugs (`shop.html`, `/shop/`) gets
+no WP Page item: WooCommerce owns that page. Add it with the store-links script **at the moment
+the walk reaches it in the demo nav**, between the `add-post` calls of its neighbours, so it
+keeps the demo's position; the script appends:
+
+```bash
+bash -c '$WP eval-file "$1/skills/wp-woocommerce/scripts/store-links.php" menu "$2" "$3" "$4"' _ "${CLAUDE_PLUGIN_ROOT}" '<menu>' '<surface>' '<demo link text>'
+```
+
+It adds a `post_type` item whose object is WooCommerce's page (`wc_get_page_id()`), so a
+renamed page keeps its link, and it adds nothing to a menu that already holds that page.
+
+| Line | Do |
+|---|---|
+| `added` / `ok` | go on |
+| `skipped product: …` | a single product has no WooCommerce page: list the link under Review |
+| `skipped cart: …` / `skipped checkout: …` | a catalog store has neither: drop the link and list it under Review |
+| `missing …` (exit `1`) | WooCommerce has no published page for it, or the menu does not exist: list it under Review and go on |
+
+**Under `polylang`**, every language's menu gets the same WooCommerce page, titled in its own
+language: WooCommerce has one shop, cart, checkout and account page until the Polylang bridge.
+
 ### Assign menus to theme locations
 
 Use the hyphenated location names `register_nav_menus()` registers in the theme:

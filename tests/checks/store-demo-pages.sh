@@ -5,7 +5,7 @@
 # and /wp-seed created a WP Page at the shop's slug. This pins the store role end to end: the
 # manifest schema and the demo plan carry it, the normalizer decides it from the page and not the
 # file name alone, /wp-yolo builds no page or section for it and keeps it out of /wp-seed, and
-# the links the demo makes to it are reported, not silently dropped.
+# the links the demo makes to it are rewired by /wp-seed or reported, never silently dropped.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . tests/lib/assert.sh
@@ -29,8 +29,8 @@ need_token "$yolo" 'add "run /wp-woo-setup first".'
 need_token "$yolo" 'slugs of every `pages[role=cpt-archive]` and `pages[role=store]` entry'
 need_token "$yolo" 'no `/wp-section`, no ledger'
 need_token "$yolo" 'whatever Step 2.5 recorded for them.'
-need_token "$yolo" 'Links to them (nav, buttons) are not'
-need_token docs/known-ceilings.md '**A demo'"'"'s links to its store pages are not rewired.**'
+need_token "$yolo" 'rewired by `/wp-seed` in Step 5 (`--store-pages`)'
+need_token docs/known-ceilings.md '**A demo'"'"'s links to its store pages are rewired in menus and link fields only.**'
 need_token "$norm" 'A translated'
 need_token skills/wp-yolo-run/references/checkpoint.md 'blog / store, with the store surface'
 

@@ -86,6 +86,17 @@ digest cannot distinguish.
 
 This approach is storage-format-agnostic and works regardless of how ACF stores the data internally.
 
+**A link field whose demo `href` targets a `--store-pages` slug** (a "Shop now" button on
+`shop.html`) gets WooCommerce's permalink for that surface, never the demo file name or a
+`/<slug>/` that no WP Page answers:
+
+```bash
+bash -c '$WP eval-file "$1/skills/wp-woocommerce/scripts/store-links.php" url "$2"' _ "${CLAUDE_PLUGIN_ROOT}" '<surface>'
+```
+
+`url <surface>: <permalink>`: seed the permalink. `skipped` or `missing`: leave the field's
+fallback and list the button under Review with the line.
+
 Every `update_field()` below is subject to the three-way compare above, and writes the
 field's digest in the same step that writes the value. A value written without its digest is
 indistinguishable from a client edit on the next run, and will be reported as a conflict

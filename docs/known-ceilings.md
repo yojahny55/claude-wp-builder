@@ -455,12 +455,12 @@ These are deliberate, documented limits — not bugs to "fix" on sight:
   per-IP row as the checkout limit, and ordinary cart traffic created that row first in the
   measurement, so six checkout attempts in a row went through. Setup turns on only the checkout
   limit; `tests/checks/store-kit.sh` fails if anything enables the general one.
-- **A demo's links to its store pages are not rewired.** `/wp-yolo` builds no WP Page for a
-  `role: store` page, so a nav item or button pointing at `shop.html` has no page to resolve to.
-  It lists each such link under Review instead of adding a menu item: a correct one depends on
-  the menu per language, its position in the demo nav and an idempotent re-seed, which belong
-  in `/wp-seed`'s menu step, still to come. Under Polylang every language's link goes to
-  WooCommerce's single page until the Polylang bridge.
+- **A demo's links to its store pages are rewired in menus and link fields only.** `/wp-seed`
+  (`--store-pages`, passed by `/wp-yolo`) points nav items and ACF link fields at WooCommerce's
+  own pages. A link inside free text (a WYSIWYG paragraph) keeps its demo `href`, a link to a
+  single product page has no WooCommerce page to point at, and a catalog store drops its cart
+  and checkout links; each is listed under Review. Under Polylang every language's link goes
+  to WooCommerce's single page until the Polylang bridge.
 - **The header cart count follows WooCommerce's announcements, not every change.** It is the
   server's count, re-read from the Store API when WooCommerce fires `added_to_cart`,
   `removed_from_cart`, `wc-blocks_added_to_cart` or, from the cart and checkout blocks,
