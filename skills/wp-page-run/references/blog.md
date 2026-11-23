@@ -2,6 +2,13 @@
 
 `commands/wp-page.md` sends the run here at "Type: blog" (the blog archive, single post and card templates, their ACF fields and CSS dispatch). Follow it in order; nothing in it is optional background.
 
+## Contents
+
+- Templates, fields and CSS — the archive, single post and card templates, `fields/blog.php`, the blog CSS
+- Blog language (suffix strategy only) — the `post_language` field and the language filter
+
+## Templates, fields and CSS
+
 Dispatch **wp-template** agent:
 
 > Generate these blog template files:
