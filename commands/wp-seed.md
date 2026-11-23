@@ -1,7 +1,7 @@
 ---
 description: Seed WordPress content from demo HTML — parses sections, creates pages, imports media, populates ACF fields, builds menus, supports bilingual content
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
-argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>] [--store-pages <slug=surface,...>] [--force-fields] [--force-adopted]"
+argument-hint: "[demo-file.html] [--exclude-slugs <slug,slug,...>] [--store-pages <slug=surface,...>] [--products <file>] [--force-fields] [--force-adopted]"
 ---
 
 # WP Seed — Content Seeding from Demo HTML
@@ -219,6 +219,17 @@ Store all page IDs for use in later phases (menu creation, page-specific field s
 
 ---
 
+## Phase 2.5: Products (`--products` only)
+
+Only when `--products <file>` was passed and `.wp-create.json` has a `store` block: create the
+store's products from that file with WooCommerce's own classes, resolved and compared like the
+pages and fields around them.
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/wp-seed-run/references/products.md` now and follow
+it — it is this phase, not background. It covers the products file, the gate, the dry run, and where each output line goes in the Seed Report.
+
+---
+
 ## Phase 3: Import Media
 
 Import all collected image URLs into the WordPress media library.
@@ -327,6 +338,7 @@ Print a summary of everything that was seeded:
 === Seed Complete ===
 Pages created:     Home (ID: 5), Services (ID: 7), Contact (ID: 8)
 Pages updated:     (none)
+Products:          4 created, 0 updated, 0 unchanged, 1 conflict, 0 degraded   (--products only)
 Front page:        Home (ID: 5)
 Author:            admin (ID: 1) — 0 posts without one
 Media imported:    12 of 14 succeeded

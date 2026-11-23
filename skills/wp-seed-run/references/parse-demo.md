@@ -22,6 +22,10 @@
   Those slugs are excluded like `--exclude-slugs`, and every demo link to one of them (a nav
   item, a button) points at WooCommerce's own page instead: Phase 6 for menus, Phase 4 for
   link fields. Default: none.
+- **`--products <file>`** = optional; a JSON file holding the store's products: the
+  `products[]` of `demo/.yolo-manifest.json`, or a client's `products.json` with the same entry
+  shape. `/wp-yolo` passes it on a store. Phase 2.5 seeds them; without it, no product is
+  created. Default: none.
 
 ### Locate the demo file
 
