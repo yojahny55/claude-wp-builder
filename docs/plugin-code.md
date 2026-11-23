@@ -43,6 +43,9 @@ load-bearing gates rather than helpers:
   through a state file.
 - `style-diff.mjs` — before/after computed-style snapshots and diff with a two-baseline noise
   filter: the measurement behind "a tag swap is a visual change".
+- `section-diff.mjs` — one built section against its demo section, pixel by pixel per viewport
+  (pixelmatch over the shared area, width and height deltas apart), with demo, site and diff images.
+- `theme-screenshot.mjs` — the theme's 1200x900 `screenshot.png` from the built homepage.
 - `decision-sheet.mjs` — the approval page for `design_impact` findings and the parser for its
   answers.
 - `audit-report.mjs` — renders an audit run into a dated Markdown and HTML deliverable.
