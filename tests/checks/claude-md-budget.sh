@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*"; exit 1; }
 
-MAX=260
+MAX=150
 lines=$(wc -l < CLAUDE.md)
 [ "$lines" -le "$MAX" ] || fail "CLAUDE.md is $lines lines, over the $MAX budget: move the reasoning to docs/ and keep the rule"
 

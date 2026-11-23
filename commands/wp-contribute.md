@@ -112,7 +112,7 @@ new or old.
 
 1. Run the two gates from step 4 above. A red gate is fixed first: there is no point judging
    a skill that does not load.
-2. Dispatch **one** fresh subagent (`general-purpose`) — fresh, because the author's own
+2. Dispatch **one** fresh subagent (`general-purpose`, `model: sonnet`) — fresh, because the author's own
    context fills exactly the gaps the written skill leaves:
 
    > Review the skill at `skills/<name>/` against
