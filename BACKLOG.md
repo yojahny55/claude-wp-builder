@@ -18,8 +18,8 @@ item was checked against what 1.40.0 shipped. Delivered and marked so: `/wp-main
 blog language field, legal page drafts, WebP on upload and the WebP migration of an existing
 library, the theme screenshot, and the `wp-js` agent. Moved forward but still partial: the
 visual QA loop (`/wp-section --visual` loops on `section-diff.mjs`; `/wp-yolo` does not pass
-it), WooCommerce N01 (piece 2 of 8, the enquiry channels), and multi-platform support (phase 1,
-the exporter; phase 2 waits for a decision). The craft-family item stays partial until the
+it), WooCommerce N01 (piece 2 of 8, the enquiry channels), and multi-platform support is
+closed at phase 1 (the exporter; phase 2 was declined). The craft-family item stays partial until the
 next real craft demo. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
@@ -349,8 +349,8 @@ Longer-term features and exploration areas.
 - [x] **Verify bulk transfers by result, not by exit code** `DELIVERED`
   Three separate measurements in one project of a tool reporting success without doing the work: a mirror writing 7 of 38 objects and exiting `0`, the same mirror "succeeding" against a stopped backend, and an interactive `cp` alias silently skipping copies that invalidated an A/B measurement. The rule is written down in [wp-contributing](skills/wp-contributing/SKILL.md) (a `transfer-verified:` comment beside every bulk transfer, saying how its result is confirmed), and `tests/checks/transfers-verified-by-result.sh` fails on a shipped script that adds a transfer without one. [wp-backup.sh](bin/wp-backup.sh) counts the uploads archive against the disk and records it, [wp-restore.sh](bin/wp-restore.sh) checks that count before swapping uploads in, and `store-kit-sync.sh`, `audit-suite.sh` and `s3-setup.sh` confirm their copies.
 
-- [ ] **Multi-platform support** `PARTIAL`
-  Explore supporting Cursor, Gemini CLI (Codex), and other AI coding tools alongside Claude Code. The plugin architecture (markdown commands/agents/skills) may be adaptable. Phase 1 is delivered without changing a command: [export-platform.mjs](bin/export-platform.mjs) writes an `AGENTS.md` index, one Cursor rule per command (attached on request) or Gemini CLI commands (`GEMINI.md` plus TOML, `$ARGUMENTS` as `{{args}}`), with every `${CLAUDE_PLUGIN_ROOT}` path made absolute and a preamble that tells the other agent to do a subagent's work itself, in sequence, and to ask AskUserQuestion's questions in the chat; [export-platform](tests/checks/export-platform.sh) runs all three. **Gap:** phase 2, taking `Agent`, `AskUserQuestion` and `${CLAUDE_PLUGIN_ROOT}` out of the commands themselves, changes every command and waits for a decision.
+- [x] **Multi-platform support** `DELIVERED`
+  Explore supporting Cursor, Gemini CLI (Codex), and other AI coding tools alongside Claude Code. The plugin architecture (markdown commands/agents/skills) may be adaptable. Phase 1 is delivered without changing a command: [export-platform.mjs](bin/export-platform.mjs) writes an `AGENTS.md` index, one Cursor rule per command (attached on request) or Gemini CLI commands (`GEMINI.md` plus TOML, `$ARGUMENTS` as `{{args}}`), with every `${CLAUDE_PLUGIN_ROOT}` path made absolute and a preamble that tells the other agent to do a subagent's work itself, in sequence, and to ask AskUserQuestion's questions in the chat; [export-platform](tests/checks/export-platform.sh) runs all three. Phase 2, taking `Agent`, `AskUserQuestion` and `${CLAUDE_PLUGIN_ROOT}` out of the commands themselves, was declined on November 23, 2026: it rewrites every command and weakens them in Claude Code, the platform the plugin is actually used on, to gain what the exporter already produces at export time. When another platform needs more, the exporter is extended, not the commands.
 
 - [x] **Tailwind build integration** `DELIVERED`
   The `__tailwind__` starter ships `package.json` and the Tailwind v4 build; [wp-tailwindify](commands/wp-tailwindify.md) converts a demo's CSS and [wp-tailwind-migrate](commands/wp-tailwind-migrate.md) migrates an existing theme. Duplicate of *Detect and support Tailwind CSS* above.
