@@ -46,6 +46,17 @@ functions free of WordPress calls: `pllx_acf_write()` is the wrapper that reache
 `get_field()`/`update_field()`, and it stays in `pll-import.php`, which cannot be required
 at all because it runs a whole import at top level.
 
+## Craft mode build
+
+Moved out of `CLAUDE.md`, which keeps the browser prerequisite and the `demo/DESIGN.md` handoff.
+Craft builds read `skills/wp-demo-craft/` and ship GSAP plus `motion.js` in the theme bundle;
+plain builds ship neither and use the `wp-aos-animator` skill instead. A craft build writes two
+files: `demo/BRIEF.md` (the story) and `demo/DESIGN.md` (tokens, in the open Stitch DESIGN.md
+format). `/wp-init` reads `demo/DESIGN.md` before scraping `:root`, and copies it into the theme.
+Sections are built from `skills/wp-demo-craft/compositions/` (previews rendered against the
+neutral `references/design-md/_preview.md`), and verified by `npx impeccable detect` plus the
+seven-line rubric in `references/verify.md`, at most three rounds.
+
 ## Craft token aliases
 
 **The two token vocabularies are joined by aliases, not by a rename.** The
@@ -59,9 +70,14 @@ near-black canvas, because what the starter's CSS depends on is the contrast pai
 not the name. The table is appended to the theme's copied `DESIGN.md` under
 `## Token aliases` so later agents read the mapping instead of guessing it.
 
-### A store is a recorded decision
-
 ## Store
+
+The `store` block of `.wp-create.json` records tier (`catalog`, `store`, `full`), address,
+currency, checkout type, shipping, tax and Stripe in test mode, validated by `bin/wp-config.mjs`
+like every other manifest field, with the Stripe keys as secrets beside the database password.
+`/wp-woo-setup` writes the block and runs `skills/wp-woocommerce/scripts/woo-setup.php`, which
+brings WooCommerce in line with it and records a hash of every value it writes in
+`store_kit_setup_state`.
 
 Behaviour that must survive a theme
 switch lives in `plugins/store-kit/`, copied into the site by `bin/store-kit-sync.sh`: catalog
