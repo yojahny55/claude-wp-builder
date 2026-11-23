@@ -156,8 +156,12 @@ function checks() {
   try { report = JSON.parse(a.out); } catch { refuse(`store-audit printed no report: ${lastLine(a.err) || `exit ${a.code}`}`, 2); }
   if (a.code === 2) refuse(`store-audit could not measure: ${(report.unmeasured[0] || {}).reason || `exit ${a.code}`}`, 2);
   const blocking = report.findings.filter((f) => (f.severity === 'CRITICAL' && f.check !== 'STORE-014') || BLOCKING.includes(f.check));
-  if (blocking.length) line('fail', 'audit', blocking.map((f) => `${f.check} ${f.message}`).join('; '));
-  else line('pass', 'audit', `no blocking finding${report.findings.length ? `; to read: ${report.findings.map((f) => `${f.check} ${f.severity}`).join(', ')}` : ''}`);
+  // A check the audit could not measure is not a pass. STORE-004 is the cart, which --read-only
+  // never opens and the verify above has just run.
+  const unknown = report.unmeasured.filter((u) => u.check !== 'STORE-004');
+  if (blocking.length || unknown.length) {
+    line('fail', 'audit', [...blocking.map((f) => `${f.check} ${f.message}`), ...unknown.map((u) => `${u.check} not measured: ${u.reason}`)].join('; '));
+  } else line('pass', 'audit', `no blocking finding${report.findings.length ? `; to read: ${report.findings.map((f) => `${f.check} ${f.severity}`).join(', ')}` : ''}`);
   return JSON.parse(facts[1]);
 }
 

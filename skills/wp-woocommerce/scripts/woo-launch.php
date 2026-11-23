@@ -31,8 +31,8 @@
  * PHP 7.4 floor.
  */
 
-/** Cloudflare's documented Turnstile test keys: always pass, always block, or challenge. */
-const WOOLAUNCH_TURNSTILE_TEST_KEY = '/^[123]x0{20,}A[AB]$/';
+/** Cloudflare's documented Turnstile test keys (site keys end AA, AB, BA, BB or FF; secrets AA). */
+const WOOLAUNCH_TURNSTILE_TEST_KEY = '/^[123]x0{20,}[A-F]{2}$/';
 
 const WOOLAUNCH_STRIPE_PLUGIN    = 'woocommerce-gateway-stripe/woocommerce-gateway-stripe.php';
 const WOOLAUNCH_TURNSTILE_PLUGIN = 'simple-cloudflare-turnstile/simple-cloudflare-turnstile.php';

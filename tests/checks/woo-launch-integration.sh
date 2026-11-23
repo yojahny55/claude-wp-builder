@@ -110,6 +110,9 @@ done
 $WP config set CF_TURNSTILE_SITE_KEY 1x00000000000000000000AA --type=constant --quiet
 L >/dev/null
 has "fail turnstile:cfturnstile_key: CF_TURNSTILE_SITE_KEY is Cloudflare's test key" "Turnstile's test key"
+$WP config set CF_TURNSTILE_SITE_KEY 3x00000000000000000000FF --type=constant --quiet
+L >/dev/null
+has "fail turnstile:cfturnstile_key: CF_TURNSTILE_SITE_KEY is Cloudflare's test key" "Turnstile's forced-challenge test key"
 $WP config set STORE_KIT_STRIPE_SECRET_KEY sk_test_notlive --type=constant --quiet
 L >/dev/null
 has "fail stripe:secret_key: STORE_KIT_STRIPE_SECRET_KEY does not look like a live Stripe key" "a test key in the live constant"

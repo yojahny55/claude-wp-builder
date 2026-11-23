@@ -54,7 +54,11 @@ code=0; node "$tool" /nonexistent --revert --confirm x >/dev/null 2>&1 || code=$
 # The PHP: production, live prefixes, real Turnstile keys, never a key written, coming soon last.
 need_token "$php" "'production' === \$env"
 need_token "$php" "foreach ( array( 'secret_key', 'publishable_key', 'webhook_secret' ) as \$field ) {"
-need_token "$php" "const WOOLAUNCH_TURNSTILE_TEST_KEY = '/^[123]x0{20,}A[AB]\$/';"
+need_token "$php" "const WOOLAUNCH_TURNSTILE_TEST_KEY = '/^[123]x0{20,}[A-F]{2}\$/';"
+for k in 1x00000000000000000000AA 2x00000000000000000000AB 1x00000000000000000000BB 3x00000000000000000000FF 1x0000000000000000000000000000000AA; do
+  php -r 'exit( preg_match( "/^[123]x0{20,}[A-F]{2}$/", $argv[1] ) ? 0 : 1 );' "$k" || fail "Cloudflare's test key $k passes as a real one"
+done
+need_token "$tool" "const unknown = report.unmeasured.filter((u) => u.check !== 'STORE-004');"
 need_token "$php" "woolaunch_refuse( \"\$woolaunch_fail precondition(s) fail: nothing was written\" );"
 if grep -E "update_option\( *'cfturnstile_(key|secret)'|WPConfigTransformer|define\( *'(STORE_KIT_STRIPE|CF_TURNSTILE)" "$php" >/dev/null; then
   fail "$php writes a key: launch checks the keys in wp-config.php and never writes one"
