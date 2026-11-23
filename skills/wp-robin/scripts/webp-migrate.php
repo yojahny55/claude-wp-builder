@@ -350,18 +350,34 @@ function webp_migrate_db_ok( $what ) {
  * file outside the map also matches: a false alarm is fixable, a false all-clear moves files
  * that are still in use. Returns a list of regexes over chunks of the names.
  */
-function webp_migrate_verify_patterns( $map ) {
+function webp_migrate_verify_patterns( $map, $skip_siblings = true ) {
 	$names = array();
 	foreach ( array_keys( $map ) as $rel ) {
-		$base                           = basename( $rel );
-		$names[ preg_quote( $base, '~' ) ] = true;
-		$names[ preg_quote( rawurlencode( $base ), '~' ) ] = true;
+		foreach ( webp_migrate_name_forms( basename( $rel ) ) as $form ) {
+			$names[ preg_quote( $form, '~' ) ] = true;
+		}
 	}
 	$patterns = array();
 	foreach ( array_chunk( array_keys( $names ), 400 ) as $chunk ) {
-		$patterns[] = '~(?:' . implode( '|', $chunk ) . ')(?!\.webp)~i';
+		$patterns[] = '~(?:' . implode( '|', $chunk ) . ')' . ( $skip_siblings ? '(?!\.webp)' : '' ) . '~i';
 	}
 	return $patterns;
+}
+
+/**
+ * Every spelling a stored value can give one file name: as is, percent-encoded both ways
+ * (`%20` and `+`), JSON-escaped (`\u00e9` for a non-ASCII byte, `\/` cannot occur in a base
+ * name), and HTML-escaped (`&amp;`).
+ *
+ * @return string[]
+ */
+function webp_migrate_name_forms( $base ) {
+	$forms = array( $base, rawurlencode( $base ), urlencode( $base ), htmlspecialchars( $base, ENT_QUOTES ), htmlentities( $base, ENT_QUOTES, 'UTF-8' ) );
+	$json  = json_encode( $base );
+	if ( is_string( $json ) ) {
+		$forms[] = substr( $json, 1, -1 );
+	}
+	return array_values( array_unique( array_filter( $forms, 'strlen' ) ) );
 }
 
 function webp_migrate_names_old( $raw, $patterns ) {
@@ -411,8 +427,8 @@ function webp_migrate_scan_column( $t, $c, $pk, $where, $patterns ) {
  * the stored bytes with its own matcher and never decodes them, so a value replace could not
  * rewrite, or a reference replace's pattern does not see, still counts.
  */
-function webp_migrate_scan_all( $map ) {
-	$patterns = webp_migrate_verify_patterns( $map );
+function webp_migrate_scan_all( $map, $skip_siblings = true ) {
+	$patterns = webp_migrate_verify_patterns( $map, $skip_siblings );
 	$total    = 0;
 	$per      = array();
 	foreach ( webp_migrate_columns() as list( $t, $c, $pk, $where ) ) {
@@ -597,8 +613,25 @@ switch ( $wm_action ) {
 		$new_files = array_flip( array_values( $map ) );
 		$moved     = 0;
 		$bytes     = 0;
+		// Robin's <name>.png.webp siblings move with their PNG only when nothing stored names
+		// them: verify's own matcher skips them on purpose, so they get their own scan here.
+		$siblings = array();
 		foreach ( array_keys( $map ) as $rel ) {
-			foreach ( array( $rel, $rel . '.webp' ) as $f ) {
+			if ( file_exists( $wm_base . '/' . $rel . '.webp' ) ) {
+				$siblings[ $rel . '.webp' ] = $rel . '.webp';
+			}
+		}
+		$keep_siblings = false;
+		if ( $siblings ) {
+			list( $sib_refs ) = webp_migrate_scan_all( $siblings, false );
+			if ( $sib_refs ) {
+				$keep_siblings = true;
+				WP_CLI::warning( "webp-migrate: $sib_refs rows name Robin's .png.webp siblings; the siblings stay in uploads" );
+			}
+		}
+		foreach ( array_keys( $map ) as $rel ) {
+			$files = $keep_siblings ? array( $rel ) : array( $rel, $rel . '.webp' );
+			foreach ( $files as $f ) {
 				if ( isset( $new_files[ $f ] ) || ! file_exists( $wm_base . '/' . $f ) ) {
 					continue;
 				}
@@ -613,6 +646,6 @@ switch ( $wm_action ) {
 				$moved++;
 			}
 		}
-		webp_migrate_out( array( 'summary' => 'move-aside', 'moved' => $moved, 'bytes' => $bytes, 'backup' => $wm_backup, 'dry_run' => $wm_dry ) );
+		webp_migrate_out( array( 'summary' => 'move-aside', 'moved' => $moved, 'bytes' => $bytes, 'kept_siblings' => $keep_siblings, 'backup' => $wm_backup, 'dry_run' => $wm_dry ) );
 		break;
 }

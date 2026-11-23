@@ -76,6 +76,9 @@ q "update_post_meta($post, '_elementor_data', wp_slash('[{\"settings\":{\"image\
 q "update_option('fx_theme_opts', array('logo' => '$small_url', 'n' => 1));"
 q "set_transient('fx_cache', '$small_url', 3600);"
 guid_before=$(q "echo get_post_field('guid',$big);")
+# A Robin sibling on disk, named by the post content ("robin:<url>.webp" above): it must stay.
+small_file=$(q "echo get_attached_file($small);")
+command cp -f "$small_file" "$small_file.webp"
 # Shapes replace must not rewrite blindly: an object inside a serialized option, a table with
 # no primary key, and a meta value serialized twice (which it must rewrite, keeping lengths).
 q "update_option('fx_obj', (object) array('logo' => '$small_url'));"
@@ -163,6 +166,8 @@ out=$(run verify "$WORK") || fail "verify failed after replace: $out"
 if run move-aside "$WORK" "backup=$up/old" >/dev/null; then fail "move-aside accepted a backup folder inside uploads"; fi
 out=$(run move-aside "$WORK" "backup=$BACKUP") || fail "move-aside failed: $out"
 [ -z "$(find "$up" -name '*.png' | sed -n 1p)" ] || fail "a PNG is still in uploads after move-aside"
+[ -f "$small_file.webp" ] || fail "move-aside moved a Robin .png.webp sibling that the content still names"
+printf '%s\n' "$out" | grep -c '"kept_siblings":true' >/dev/null || fail "move-aside did not report the kept siblings: $out"
 [ -n "$(find "$BACKUP" -name '*.png' | sed -n 1p)" ] || fail "the backup folder holds no PNG"
 cut -f2 "$WORK/map.tsv" | sort -u | while read -r rel; do
   [ -f "$up/$rel" ] || fail "new file $rel is missing after move-aside"
