@@ -279,8 +279,13 @@ Server setup, permissions, and WordPress configuration.
   with their WooCommerce surface in the [`/wp-yolo`](commands/wp-yolo.md) manifest
   ([wp-normalize](agents/wp-normalize.md)), so no WP Page or section build collides with
   WooCommerce's own pages, and every demo link to them is reported for review
-  ([check](tests/checks/store-demo-pages.sh)); styling those pages from the demo and rewiring
-  their links are still to come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
+  ([check](tests/checks/store-demo-pages.sh)). Of its second half, the theme base is delivered:
+  `/wp-woo-setup` Step 6.6 installs [WooCommerce support](templates/store/store-theme.php) and
+  [a store-only stylesheet](templates/store/store.css) in the theme's tokens into a new store's
+  tailwind theme, or an existing one with `--store-theme`
+  ([check](tests/checks/store-theme.sh), [on a real store](tests/checks/store-theme-integration.sh));
+  the demo's own store styling, a cart link in the header and rewiring the demo's links are
+  still to come. Not started, each its own spec: product seeding and `/wp-woo-verify`, the store audit and launch step, the Polylang
   bridge, subscriptions, bookings.
 
 - [x] **One unexplained integration failure in store setup** `DELIVERED`
