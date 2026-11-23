@@ -146,7 +146,9 @@ files move to a folder outside uploads only after nothing points at them. It run
 `${CLAUDE_PLUGIN_ROOT}/skills/wp-robin/references/png-to-webp-conversion.md` as a script.
 **Read that reference before the first run**; this section is the order, the reference is
 the why, and its *Traps* section is the repair manual. JPEGs are not converted: the measured
-saving was on PNG originals, and a JPEG is already lossy.
+saving was on PNG originals, and a JPEG is already lossy. An attachment whose file names hold
+anything outside `A-Z a-z 0-9 . _ -` is skipped and listed: a reference to it can be stored in
+spellings `verify` could not prove gone, so it is converted by hand or renamed first.
 
 Do not run it to save a few large PNGs (resize those), or on a site whose uploads live in S3
 (the script refuses a stream-wrapper uploads directory: convert a local copy). On a live site
