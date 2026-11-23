@@ -5,4 +5,6 @@
   button colour, the lead's size — must each differ from the baseline by more than the
   0.1% tolerance, so the baselines cannot quietly lose that sight. A one-step text tint
   measures 0% and is left to the computed-style checks. A failed run now also keeps the
-  rendered shots for approval, and its evidence folder is ignored by git.
+  rendered shots for approval, its evidence folder is ignored by git, and CI uploads it:
+  the upload step skipped it as a hidden path, so no failed visual run had ever shipped
+  its diffs.

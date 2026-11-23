@@ -104,7 +104,7 @@ the lead's size), and the comparer fails unless every one differs from the basel
 more than the tolerance (measured 0.37% to 2.06%). One grey step on thin glyphs measures
 0.0000%, under pixelmatch's per-pixel threshold; that change belongs to the parity gate
 and `bin/style-diff.mjs`, which compare computed styles. A failed run keeps the diffs and
-the rendered shots in `tests/baselines/.failed-diffs/`, ignored by git; approving a new or
+the rendered shots in a `.failed-diffs/` folder under `tests/baselines/`, ignored by git; approving a new or
 changed baseline means copying its PNG from `rendered/` in a `baseline: <why>` commit.
 
 Still not covered: a generated site end to end, the broken-site corpus with expected audit
