@@ -112,6 +112,17 @@ translates these, so a drifted key still renders; the left column is what to wri
 | `root_cause` | `rootCause` |
 | `severity` | `ERROR`, `HIGH` (CRITICAL); `WARN`, `MEDIUM` (WARNING); `LOW`, `NOTE` (INFO); any case |
 
+It also accepts three report shapes that agents drifted into in a real run:
+
+- `not_applicable` and `unmeasured` written as a map keyed by check id,
+  `{ "SEO-021": "no SEO plugin active" }`, read as the array form. Write the array form.
+- A report with no `category` key takes it from its file name, `agents/wp-audit-<x>.json`.
+  Write the key anyway: a shard file named another way has no other source.
+- A scan note in `findings` (`check: "VENDOR"`, or a non-catalog id with `status: "INFO"`)
+  is moved to the report's notes and never counted as a finding. A note about the scan goes
+  in the top-level `notes` (or `vendor_notes`) array. A catalog id with `status: "INFO"`
+  stays refused: that is a finding whose status was confused with its severity.
+
 It refuses, with exit `1`, a finding that has no check id, an id that is not in any catalog, or
 a check that is both a `FAIL` and a `PASS` (or listed in `passes`) for the same resource.
 `bin/audit-coverage.mjs` reads the same reports, so `checks_executed` is the field it counts.
@@ -215,6 +226,15 @@ owner's severity: the detectors differ, so a defect only the duplicate sees is s
 measured defect. Duplicates keep their rows and stay in `checks_executed` as normal, so a
 single-category audit still measures the defect and coverage does not change. An owner and
 its duplicates carry the same severity.
+
+**One defect, one fix, one `root_cause`.** A slug names a defect that a single fix
+removes, never a place. Two defects with different fixes in the same function keep
+different slugs, even on adjacent lines: a handler that concatenates a request value into
+SQL and also skips the nonce check is `sqli:<file>:<line>` (fixed with `$wpdb->prepare()`)
+and `missing-nonce:<file>:<line>` (fixed with `check_admin_referer()`). Sharing one slug
+would fold the second defect under the first, and fixing the SQL would look like it closed
+both. Share a slug only when the duplicates in the table above, or several findings of one
+check, disappear with the same edit.
 
 **A folded id is still failing.** The report's comparison counts every id under
 `also_affects` as present, and the ledger does the same: a duplicate's open entry whose

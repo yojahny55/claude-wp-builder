@@ -17,8 +17,8 @@ unchecked. A `PARTIAL` item is unchecked because the remaining gap is the item.
 item was checked against what 1.38.0 shipped: headroom under the command size ceilings,
 blocking stdio in the `bin/*.mjs` tools, shorter skill descriptions and `wp-template` reading
 its conditional sections from references. All of it is maintenance; no item moved. The
-seeded-defects corpus stays partial until a live `/wp-audit` run is judged with the owner
-present, and the craft-family item until the next real craft demo. The full pass against
+seeded-defects corpus has since been judged against a live `/wp-audit` run and is
+delivered; the craft-family item stays partial until the next real craft demo. The full pass against
 the command, agent or script that would own each item was last made at v1.31.0. An item
 claiming to be open while the behavior ships reads as a project that does not know what it
 has built.
@@ -158,8 +158,8 @@ Making the command flow smoother and more guided.
 - [x] **Walk the default-motion branch** `DELIVERED`
   [motion-devices](tests/checks/motion-devices.sh) now drives both paths. Under default motion it loads the real pinned GSAP from `node_modules` and asserts the rail's transform tracks scroll and that the JS `reveal` branch hides its children and then shows them — reached by forcing `CSS.supports('animation-timeline', …)` to report false, since every browser the suite can run supports it and the CSS engine would otherwise take over.
 
-- [ ] **Broken-site corpus with expected audit findings** `PARTIAL`
-  A fixture site seeded with known defects and a file of the findings an audit should report. Without it no test can fail because an audit *missed* a defect — the ceiling CLAUDE.md records for the whole audit family. [seeded-defects](tests/fixtures/seeded-defects/) now ships a theme and plugin with 11 marked defects and `expected-findings.json`, and [provision.sh](tests/fixtures/wp/provision.sh) installs them with `WP_FIXTURE_SEEDED=1`. **Gap:** [the check](tests/checks/seeded-defects.sh) validates the corpus offline and, in CI, compares it against a committed `recorded-findings.json` (with a negative case); comparing a real `/wp-audit` run still needs `SEEDED_FINDINGS`, and CI has no live audit run to compare.
+- [x] **Broken-site corpus with expected audit findings** `DELIVERED`
+  A fixture site seeded with known defects and a file of the findings an audit should report, so a test can fail because an audit *missed* a defect. [seeded-defects](tests/fixtures/seeded-defects/) ships a theme and plugin with 11 marked defects and `expected-findings.json`; [provision.sh](tests/fixtures/wp/provision.sh) installs them with `WP_FIXTURE_SEEDED=1`, without their `SEEDED` markers, on a core verified against its checksums. [The check](tests/checks/seeded-defects.sh) validates the corpus offline, compares a committed `recorded-findings.json` in CI (with negative cases), and compares a real run through `SEEDED_FINDINGS`, counting a code folded under `also_affects` as fired. A live report-only `/wp-audit` over the five code domains reported 11 of 11. What that run exposed in the agent report contract is fixed in [audit-schema.mjs](bin/lib/audit-schema.mjs) and the dispatch skeleton. CI still runs no live audit: see `docs/known-ceilings.md`.
 
 - [ ] **Maintenance mode command** `OPEN`
   New `/wp-maintenance` command to enable/disable maintenance mode — either via a custom template or by installing a maintenance plugin via WP-CLI.

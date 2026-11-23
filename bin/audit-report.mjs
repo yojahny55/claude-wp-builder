@@ -1615,6 +1615,7 @@ function aggregateAgents(run, agentPaths) {
   // (`UX-045` is contrast there), so they are normalized but not held to the agents' catalogs.
   run.findings.forEach((raw) => findings.push(normalizeEntry(raw).entry));
   const extra = [];
+  const vendorNotes = [];
   for (const path of agentPaths) {
     let reports;
     try {
@@ -1628,6 +1629,10 @@ function aggregateAgents(run, agentPaths) {
       n.executed.forEach((id) => executed.add(id));
       n.passes.forEach((p) => executed.add(p.check));
       n.findings.forEach((f) => { executed.add(f.check); findings.push(f); });
+      n.vendor_notes.forEach((note) => {
+        const line = n.category ? `${n.category}: ${note}` : note;
+        if (!vendorNotes.includes(line)) vendorNotes.push(line);
+      });
       for (const u of n.unmeasured) {
         const key = `${u.check}|${u.reason ?? ''}`;
         if (!seenUnmeasured.has(key)) { seenUnmeasured.add(key); extra.push(u); }
@@ -1635,6 +1640,11 @@ function aggregateAgents(run, agentPaths) {
     }
   }
   run.findings = findings;
+  // Scan notes (what a vendor directory held) belong in "Scope and coverage", never in findings.
+  if (vendorNotes.length) {
+    const prior = run.notes === undefined || run.notes === null ? [] : Array.isArray(run.notes) ? run.notes : [run.notes];
+    run.notes = [...prior, ...vendorNotes];
+  }
   run.unmeasured = [...unmeasured.map((e) => (e && typeof e === 'object' ? normalizeEntry(e).entry : e)), ...extra];
   if (executed.size) run.checks_executed = [...executed];
   return problems;

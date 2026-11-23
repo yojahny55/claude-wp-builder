@@ -66,12 +66,35 @@ fi
 [ -f tests/fixtures/wp/provision.sh ] || fail "tests/fixtures/wp/provision.sh does not exist"
 grep -Fq 'WP_FIXTURE_SEEDED' tests/fixtures/wp/provision.sh || fail "provision.sh lost WP_FIXTURE_SEEDED"
 
+# ...without its SEEDED markers: the HTML and CSS comments are served, and an audit that reads
+# "SEEDED A11Y-007" in the page source is handed the answer. Run the same strip provision.sh
+# runs on a scratch copy: no marker survives, every defect does, the PHP still parses, and a
+# marker written inline (which the line rule cannot remove) fails the copy.
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+cp -R "$fx/theme" "$fx/plugin" "$scratch/"
+bash tests/fixtures/wp/provision.sh --strip-seeded "$scratch" >/dev/null 2>&1 || fail "provision.sh --strip-seeded failed on the corpus"
+if left=$(grep -rlE 'SEEDED [A-Z0-9]+-[0-9]+' "$scratch"); then fail "SEEDED markers survive the copy: $left"; fi
+while IFS=$'\t' read -r code file pattern; do
+  grep -Fq -- "$pattern" "$scratch/$file" || fail "$code: stripping the markers removed the defect itself from $file"
+done < <(jq -r '.defects[] | [.check,.file,.pattern] | @tsv' "$exp")
+if command -v php >/dev/null; then
+  while IFS= read -r p; do php -l "$p" >/dev/null || fail "php -l failed after stripping: $p"; done < <(find "$scratch" -name '*.php')
+fi
+printf '<?php echo 1; // SEEDED SEC-999: inline\n' > "$scratch/theme/inline.php"
+if bash tests/fixtures/wp/provision.sh --strip-seeded "$scratch" >/dev/null 2>&1; then
+  fail "provision.sh --strip-seeded accepted an inline marker it cannot remove"
+fi
+rm -rf "$scratch"
+
 # The comparison itself, as a function so the same logic runs against the recorded audit
 # (always) and against a real run (SEEDED_FINDINGS). Prints the missed codes, empty when none.
 missed_codes() {
   local fired c missed=""
   # A check id may carry a revision (SEC-036@2, see CLAUDE.md); the expected codes are bare ids.
-  fired=$(jq -r '[.findings[] | select(.status == "FAIL") | .check] | unique[]' "$1" | sed 's/@.*//')
+  # A code folded under another FAIL's also_affects (the renderer's root-cause fold) fired too:
+  # the report counts it as present, so the comparison does. Under a non-FAIL row it did not.
+  fired=$(jq -r '[.findings[] | select(.status == "FAIL") | .check, ((.also_affects // [])[] | if type == "object" then .check else . end)] | map(select(type == "string")) | unique[]' "$1" | sed 's/@.*//')
   for c in $listed; do grep -Fxq "$c" <<<"$fired" || missed="$missed $c"; done
   printf '%s' "$missed"
 }
@@ -85,10 +108,21 @@ m=$(missed_codes "$rec")
 [ -z "$m" ] || fail "the recorded audit misses seeded defects:$m (re-record it or fix the corpus)"
 first=$(printf '%s\n' "$listed" | sed -n 1p)
 neg=$(mktemp)
-trap 'rm -f "$neg"' EXIT
-jq --arg c "$first" '.findings |= map(select((.check | sub("@.*"; "")) != $c))' "$rec" > "$neg"
+trap 'rm -rf "$scratch"; rm -f "$neg" "$neg.fold"' EXIT
+drop='.findings |= map(select((.check | sub("@.*"; "")) != $c) | if .also_affects then .also_affects |= map(select(((if type == "object" then .check else . end) | sub("@.*"; "")) != $c)) else . end)'
+jq --arg c "$first" "$drop" "$rec" > "$neg"
 m=$(missed_codes "$neg")
 [ "$m" = " $first" ] || fail "negative case: dropping $first from the recorded audit should miss exactly it, got '$m'"
+
+# also_affects: the dropped code folded under another FAIL counts as fired; folded under a
+# PASS row it does not.
+host=$(jq -r --arg c "$first" '[.findings[] | select(.status == "FAIL" and ((.check | sub("@.*"; "")) != $c))][0].check' "$neg")
+jq --arg c "$first" --arg h "$host" '.findings |= map(if .check == $h then .also_affects = ((.also_affects // []) + [{check: $c, resource: "site"}]) else . end)' "$neg" > "$neg.fold"
+m=$(missed_codes "$neg.fold")
+[ -z "$m" ] || fail "also_affects: $first folded under $host should count as fired, got missed '$m'"
+jq --arg c "$first" '.findings += [{check: "WP-000", status: "PASS", also_affects: [{check: $c, resource: "site"}]}]' "$neg" > "$neg.fold"
+m=$(missed_codes "$neg.fold")
+[ "$m" = " $first" ] || fail "also_affects under a PASS row must not count as fired, got '$m'"
 
 if [ -n "${SEEDED_FINDINGS:-}" ]; then
   [ -f "$SEEDED_FINDINGS" ] || fail "SEEDED_FINDINGS=$SEEDED_FINDINGS does not exist"
