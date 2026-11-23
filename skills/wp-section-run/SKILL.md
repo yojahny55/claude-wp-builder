@@ -28,6 +28,10 @@ read it whole and follow it in order.
 | 6.7, blog section | [references/blog-templates.md](references/blog-templates.md) | When a `blog`, `journal`, `news` or `posts` section runs `/wp-page blog`, the three cases that skip it, and what the summary says |
 | 7, contact section | [references/summary-contact.md](references/summary-contact.md) | The contact summary: the CF7 form and email files, and the IDs of the forms created |
 
+## Scripts
+
+- [scripts/section-seeded.php](scripts/section-seeded.php) — run by Step 6.6 with `wp eval-file`: how many fields of `group_<slug>` hold content on the page the visual check measures (`-1` without ACF or the group).
+
 ## Changing a step
 
 Edit the reference file, not the command, unless the step order or the step's entry

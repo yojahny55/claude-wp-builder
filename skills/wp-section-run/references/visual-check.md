@@ -8,6 +8,14 @@ compares what a visitor sees, one section at a time, while the agents that wrote
 in reach: it measures the built section against its demo section pixel by pixel, and hands
 what differs back to the CSS agent, at most three times.
 
+## Contents
+
+- When it does not run
+- 1. The page that shows the section
+- 2. Is the section seeded?
+- 3. Measure
+- 4. Fix pass (exit 1), at most three rounds
+
 ## When it does not run
 
 - `--visual` absent: skip, and print nothing about it.
