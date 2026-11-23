@@ -117,7 +117,7 @@ expect() {
   [ "${2:-}" = clash ] && : > "$tmp/d/photo.webp"
   got=$(php "$tmp/run.php" "$1" "$tmp/d" "$CWEBP")
   [ "$got" = "$3" ] || fail "case $1${2:+ ($2)}: expected '$3', got '$got'"
-  stray=$(find "$(dirname "$(mktemp -u)")" -maxdepth 1 -newer "$tmp/run.php" -name 'webp*' 2>/dev/null | head -5)
+  stray=$(find "$(dirname "$(mktemp -u)")" -maxdepth 1 -newer "$tmp/run.php" -name 'webp*' 2>/dev/null | sed -n 1,5p)
   [ -z "$stray" ] || fail "case $1 left temporary files behind: $stray"
 }
 

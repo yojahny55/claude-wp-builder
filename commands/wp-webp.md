@@ -104,10 +104,12 @@ $WP eval 'if ( ! function_exists( "webp_on_upload_blocker" ) ) { echo "not loade
 After `on`, prove it on a real upload, then remove the test attachment:
 
 ```bash
-php -r '$i=imagecreatetruecolor(64,64); imagefilledrectangle($i,0,0,63,63,imagecolorallocate($i,30,120,200)); imagejpeg($i,"/tmp/webp-on-upload-probe.jpg",95);'
-id=$($WP media import /tmp/webp-on-upload-probe.jpg --porcelain)
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+php -r '$i=imagecreatetruecolor(64,64); imagefilledrectangle($i,0,0,63,63,imagecolorallocate($i,30,120,200)); imagejpeg($i,$argv[1],95);' "$T/webp-on-upload-probe.jpg"
+AUTHOR=$($WP user list --role=administrator --field=ID --number=1)
+id=$($WP media import "$T/webp-on-upload-probe.jpg" --post_author="$AUTHOR" --porcelain)
 $WP post get "$id" --field=post_mime_type
-$WP post delete "$id" --force; rm -f /tmp/webp-on-upload-probe.jpg
+$WP post delete "$id" --force
 ```
 
 `image/webp` is a pass. `image/jpeg` while the plugin said `ready` is a failure: report it. A

@@ -74,7 +74,7 @@ assert_webp "$jpg" "the imported JPEG"
 png=$($WP media import "$SCRATCH/shot.png" --porcelain)
 assert_webp "$png" "the imported PNG"
 up=$(q 'echo wp_upload_dir()["basedir"];')
-left=$(find "$up" -type f \( -name '*.jpg' -o -name '*.png' \) | head -3)
+left=$(find "$up" -type f \( -name '*.jpg' -o -name '*.png' \) | sed -n 1,3p)
 [ -z "$left" ] || fail "a JPEG or PNG was left in uploads: $left"
 
 # Paused: the same import stays JPEG.
