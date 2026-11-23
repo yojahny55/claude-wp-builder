@@ -31,7 +31,17 @@ need_token "$ref" 'skills/wp-section-run/references/visual-check.md` and follow 
 need_token "$ref" 'Never measure or fix two sections in parallel.'
 need_token "$ref" '**It never makes the run incomplete.**'
 need_token "$ref" '**It never creates or seeds content to measure.**'
-need_token "$ref" '**The first exit 2 stops the pass.**'
+need_token "$ref" '**An exit 2 for a missing tool stops the pass.**'
+need_token "$ref" 'Any other exit 2 is one page that'
+# The two stderr lines the pass stops on must still be the ones section-diff prints.
+for m in 'playwright-core, pixelmatch or pngjs is not installed' 'no existing Chrome or Chromium'; do
+  need_token "$ref" "$m"
+  need_token bin/section-diff.mjs "$m"
+done
+need_token "$ref" '(`--resume --visual`)'
+need_token "$cmd" '--resume [--accept-drift] [--visual]'
+need_token "$ref" 'assets/css/src/tailwindcss/components/'
+need_token "$ref" 'is `group_<slug>`, where `<slug>` is'
 need_token "$ref" 'The three-round cap is per section.'
 need_token "$ref" '`kind: "cpt-teaser"` sections'
 need_token "$ref" 'visual: skipped'

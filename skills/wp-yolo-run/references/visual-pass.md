@@ -29,8 +29,9 @@ manifest order. Out of scope, and not listed:
 - everything on `Template: cinematic`, and any section built `--hybrid`: say "visual: skipped
   (cinematic)" once, and stop.
 
-On a `--resume` run the list is the same: the pass is not a ledger unit, and it measures every
-built section whether this run or an earlier one built it.
+The flag is not recorded in the build ledger, so a resumed run does the pass only when
+`--visual` is passed again (`--resume --visual`). The list is then the same: the pass is not a
+ledger unit, and it measures every built section whether this run or an earlier one built it.
 
 ## How each one is measured
 
@@ -42,9 +43,18 @@ section is built with. Its "When it does not run" list applies, except the `--vi
 - Home page sections target `front-page.php`: the page `page_on_front` names.
 - Inner page sections target `page-<slug>.php`: the page `/wp-seed` created at that slug,
   which visual-check section 1 finds by slug.
-- The CSS agent is the one Step 4 routed to: `wp-css` on `basic`, `wp-tailwind` on
-  `tailwind`. "Rebuild" in a fix round is
-  `bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>` on `tailwind`.
+visual-check.md names `/wp-section`'s own steps. Read them inside this run as:
+
+- "Step 5's naming convention": the section's field group is `group_<slug>`, where `<slug>` is
+  the section name Step 4 passed to `/wp-section`, slugified, with hyphens as underscores.
+- "The routing in Step 5": the CSS agent Step 4 routed to, `wp-css` on `basic`, `wp-tailwind`
+  on `tailwind`.
+- "Step 6.5" (rebuild): `bash "${CLAUDE_PLUGIN_ROOT}/bin/tailwind-rebuild.sh" <theme-dir>` on
+  `tailwind`.
+- "The section's component CSS" on `tailwind`: every file under
+  `assets/css/src/tailwindcss/components/` that holds a rule for the section's block, which is
+  where Step 4.4's `@apply` promotion put them. Copy each one before a round, with the
+  template part.
 
 ## One section at a time
 
@@ -61,9 +71,12 @@ go on to the next one.
   is reported, not blocking: the parity gate in Step 5.5 is still the gate.
 - **It never creates or seeds content to measure.** A section whose fields are empty is "not
   measured (content not seeded yet)", the same as in `/wp-section`.
-- **The first exit 2 stops the pass.** Exit 2 is no browser or no `playwright-core`, which no
-  later section will have either: record "visual: not measured (<the tool's stderr line>)"
-  once for the whole pass and go on to item 4.
+- **An exit 2 for a missing tool stops the pass.** When the stderr line says
+  `playwright-core, pixelmatch or pngjs is not installed` or `no existing Chrome or Chromium`,
+  no later section will have them either: record "visual: not measured (<the tool's stderr
+  line>)" once for the whole pass and go on to item 4. Any other exit 2 is one page that
+  failed to load: that section is "not measured (<the tool's stderr line>)", and the pass goes
+  on to the next section.
 
 ## Report
 
@@ -74,4 +87,6 @@ under Review with the line visual-check gives it:
 Visual:            <n> pass, <n> pass after fix rounds, <n> over tolerance, <n> not measured
 ```
 
+Print it under either banner, `Build Complete` or `INCOMPLETE`: an incomplete run still built
+those sections. Sections skipped as cinematic, and `not CSS` reasons, go under Review.
 Without `--visual`, Step 6 prints no `Visual:` line.

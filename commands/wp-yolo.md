@@ -58,7 +58,7 @@ Parse `$ARGUMENTS`:
   ```
   Error: A demo folder is required.
   Usage: /wp-yolo <path-to-demo-folder> [--yolo] [--careful] [--force] [--visual]
-         /wp-yolo <path-to-demo-folder> --resume [--accept-drift]
+         /wp-yolo <path-to-demo-folder> --resume [--accept-drift] [--visual]
   ```
 - **`--yolo`** = no checkpoint at all (ingest → build → seed → finalize → report, hands-off).
 - **`--careful`** = checkpoint after normalization AND a per-page confirm before each inner
@@ -72,7 +72,8 @@ Parse `$ARGUMENTS`:
   changed since the interrupted run. Never implied by `--force`.
 - **`--visual`** = once the pages are seeded, pixel-compare every built section with its demo
   section and loop the CSS agent on the difference (Step 5, item 3). Off by default: it adds
-  a browser pass and up to three agent rounds per section over tolerance.
+  a browser pass and up to three agent rounds per section over tolerance. Not recorded in
+  the build ledger: pass it again with `--resume` to keep it.
 
 The command is named `/wp-yolo`; that name is NOT the `--yolo` flag. A bare
 `/wp-yolo <folder>` with no flags runs the Step 3 checkpoint and waits for the
