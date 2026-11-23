@@ -10,6 +10,8 @@ cd "$(dirname "$0")/../.."
 
 agent=agents/wp-js.md
 cmd=commands/wp-section.md
+# Step 6.4 keeps its skip conditions in the command; the search and dispatch live here.
+beh=skills/wp-section-run/references/behaviour.md
 [ -f "$agent" ] || fail "$agent is missing"
 
 grep >/dev/null -c '^name: wp-js$' "$agent" || fail "$agent has no name: wp-js"
@@ -37,13 +39,16 @@ need_token "$agent" 'is not a theme dependency; add it with npm install'
 
 need_token "$cmd" '## Step 6.4: Behaviour (`wp-js`)'
 need_token "$cmd" 'Skip this step under `--transcribe`'
+need_token "$cmd" 'skills/wp-section-run/references/behaviour.md` now and follow it'
 need_token "$cmd" 'under `--hybrid`, and on a'
-need_token "$cmd" 'search scripts only:'
-need_token "$cmd" '--exclude=*.min.js --exclude-dir=vendor'
-need_token "$cmd" 'bin/demo-scripts.mjs" "$2" --match "$3"'
-grep >/dev/null -c "sed -n '/<script" "$cmd" && fail "$cmd still extracts scripts by line range (prints markup after a one-line <script src>)"
+need_token "$beh" 'search scripts only:'
+need_token "$beh" '--exclude=*.min.js --exclude-dir=vendor'
+need_token "$beh" 'bin/demo-scripts.mjs" "$2" --match "$3"'
+for f in "$cmd" "$beh"; do
+  grep >/dev/null -c "sed -n '/<script" "$f" && fail "$f still extracts scripts by line range (prints markup after a one-line <script src>)"
+done
 need_token commands/wp-yolo.md '`wp-tailwind`, `wp-js`,'
-need_token "$cmd" 'dispatch **wp-js**'
+need_token "$beh" 'dispatch **wp-js**'
 need_token "$cmd" 'Behaviour: assets/js/src/sections/<slug>.js (wp-js)'
 need_token README.md '| `wp-js` |'
 need_token BACKLOG.md 'tests/checks/wp-js-agent.sh'
