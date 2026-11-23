@@ -69,7 +69,7 @@ Must validate against `cinematic-scroll-kit/schemas/scene.json`. Top-level is an
 3. For each scene:
    a. Look up existing row by `scene_id`.
    b. If exists AND `--force` not set → skip (log "kept").
-   c. Sideload media: download URL → `wp media import <file> --post_author=<admin ID> --porcelain` → capture
+   c. Sideload media: download URL → `wp media import <file> --user=<admin ID> --porcelain` → capture
       attachment ID. Without the author it is user 0, and `/wp-finalize` Check 7 fails it.
    d. Build ACF row payload (same shape as `/wp-cinematic-scene`).
    e. `update_row('cinematic_scenes', $i, $row, $home_id)`.

@@ -283,12 +283,15 @@ that does not exist. The post saves and renders, so nothing looks wrong until
 something asks for the author: `the_author()` prints nothing, an Article schema
 emits an empty `author`, the admin list shows a blank column, and a plugin that
 dereferences the author object can fatal. Resolve an author once and pass it to
-every create:
+every create. The flag differs: `wp post create` takes the post field
+`--post_author`, but `wp media import` has no such option and refuses it
+(`unknown --post_author parameter`, so the import fails outright). It takes the
+global `--user`, and the attachment belongs to that user:
 
 ```bash
 AUTHOR=$($WP user list --role=administrator --field=ID --number=1)
 $WP post create --post_author=$AUTHOR ...
-$WP media import file.jpg --post_author=$AUTHOR ...
+$WP media import file.jpg --user=$AUTHOR ...
 ```
 
 Sweep at the end of any seed run — it must print 0. Two exclusions, or the

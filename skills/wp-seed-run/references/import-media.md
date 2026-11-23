@@ -16,7 +16,7 @@ the same command that imports it, and look that up before importing:
 bash -c "$WP post list --post_type=attachment --meta_key=_<prefix>_seeded_source --meta_value='https://images.unsplash.com/photo-xxx' --format=ids"
 
 # Not found: import, and record both the marker and the source
-bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --post_author=$AUTHOR --porcelain) && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_content 1 && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_source 'https://images.unsplash.com/photo-xxx' && echo \$HERO_IMG_ID"
+bash -c "HERO_IMG_ID=\$($WP media import 'https://images.unsplash.com/photo-xxx' --title='Hero Background' --user=$AUTHOR --porcelain) && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_content 1 && $WP post meta add \$HERO_IMG_ID _<prefix>_seeded_source 'https://images.unsplash.com/photo-xxx' && echo \$HERO_IMG_ID"
 ```
 
 The source value is the URL for a remote image and the repository-relative path for a local
@@ -49,11 +49,11 @@ If the manifest (produced by `wp-normalize`) has a top-level `assets[]` array, e
 
 - **`logo`** → sideload the file, then set the site logo option:
   ```bash
-  bash -c "LOGO_ID=\$($WP media import '<file>' --title='Site Logo' --post_author=$AUTHOR --porcelain) && $WP eval \"update_field('site_logo', \$LOGO_ID, 'option');\""
+  bash -c "LOGO_ID=\$($WP media import '<file>' --title='Site Logo' --user=$AUTHOR --porcelain) && $WP eval \"update_field('site_logo', \$LOGO_ID, 'option');\""
   ```
 - **`hero`** (per page) → sideload, then set that page's `inner_hero_image` field on the page identified by `asset.page`:
   ```bash
-  bash -c "HERO_ID=\$($WP media import '<file>' --title='<Page> Hero' --post_author=$AUTHOR --porcelain) && $WP eval \"update_field('inner_hero_image', \$HERO_ID, <page_id>);\""
+  bash -c "HERO_ID=\$($WP media import '<file>' --title='<Page> Hero' --user=$AUTHOR --porcelain) && $WP eval \"update_field('inner_hero_image', \$HERO_ID, <page_id>);\""
   ```
 - **`content`** → sideload, then set the ACF field named in `asset.field` using the normal Phase 4 flow (options page or page-specific, per the field mapping table).
 - **`nav-graphic`** → sideload and register as a theme asset only (e.g. an `nav_graphic` field or enqueued static asset). **Never** assign a `nav-graphic` to `site_logo` or any content field — a mis-tagged nav graphic must not become the seeded logo.

@@ -90,7 +90,8 @@ bash -c "$WP user list --role=administrator --field=ID --number=1"
 ```
 
 Store the ID as **`$AUTHOR`**, substituted the same way as `$WP`, and pass
-`--post_author=$AUTHOR` to **every** `wp post create` and `wp media import` below. No
+`--post_author=$AUTHOR` to **every** `wp post create` and `--user=$AUTHOR` to **every**
+`wp media import` below (`media import` refuses `--post_author`, and the import fails). No
 administrator is a stop, not a default: report it rather than creating posts owned by nobody.
 
 ---
