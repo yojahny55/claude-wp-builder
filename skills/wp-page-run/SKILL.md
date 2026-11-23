@@ -18,10 +18,16 @@ read it whole and follow it in order.
 | Type | File | Covers |
 |---|---|---|
 | blog | [references/blog.md](references/blog.md) | `archive.php`, `single.php` and the journal card and single-post parts, `fields/blog.php`, the BLOG CSS dispatch |
-| legal | [references/legal.md](references/legal.md) | `page-legal.php`, `inc/legal-search.php` (legal pages out of site search), `fields/legal.php`, the CSS dispatch |
+| legal | [references/legal.md](references/legal.md) | `page-legal.php`, `inc/legal-search.php` (legal pages out of site search), `fields/legal.php`, the CSS dispatch, then the Privacy, Terms and Cookie Policy drafts |
 | 404 | [references/404.md](references/404.md) | The styled `404.php` and its CSS dispatch |
 | search | [references/search.md](references/search.md) | The styled `search.php` with its no-results state and its CSS dispatch |
 | embed | [references/embed.md](references/embed.md) | The provider-embed template and its marked insertion point, optional chrome fields, the CSS dispatch, the `Requires plugin` summary line |
+
+## Scripts
+
+[scripts/legal-pages.php](scripts/legal-pages.php) is run by the legal type's last step
+(`$WP eval-file … <spec.json> [dry-run]`), never by hand: it creates the drafted legal pages
+as drafts and leaves any page that already holds one of their slugs alone.
 
 ## Changing a step
 
