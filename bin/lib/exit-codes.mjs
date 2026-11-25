@@ -48,6 +48,13 @@ export const TOOLS = {
     1: 'usage or invalid input (bad replay record, local host or path would leak)',
     3: 'crash',
   },
+  'canary.mjs': {
+    0: 'snapshot written (a page loaded), or compare found no regression',
+    1: 'compare found a regression',
+    2: 'could not measure: no playwright-core, no Chromium, or no page loaded',
+    3: 'crash',
+    64: 'usage: bad arguments, more than one host, snapshots of different hosts',
+  },
   'composition-preview.mjs': {
     0: 'preview rendered (or --tokens printed)',
     2: 'no playwright-core or no browser',

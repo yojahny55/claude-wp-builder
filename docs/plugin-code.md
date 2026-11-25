@@ -36,6 +36,9 @@ load-bearing gates rather than helpers:
   `/wp-finalize` Check 4 and the practices audit.
 - `link-sweep.mjs` — the audits' link sweep, with the 4-in-flight cap, sampling, clone-origin
   and CDN-challenge rules built in.
+- `canary.mjs` — post-deploy check behind `/wp-update` Step 8: snapshots a live site's key
+  pages (status, console errors, failed same-site requests, landmarks) before a push and
+  compares them after.
 - `h2-proxy.mjs` — HTTP/2 + brotli proxy in front of a local site for Lighthouse runs.
 - `contrast-propose.mjs` — palette proposal for failing contrast pairs.
 - `ux-probe.mjs` — the usability audit's page harness: one browser launch per run, built-in DOM
