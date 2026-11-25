@@ -341,6 +341,8 @@ environment, in rollout order, and only after Step 5 passed on the clone.
 
    Quote the table. Exit `1` lists regressions: a page whose status broke, a new console error,
    a same-site asset that now fails, a landmark (`h1`, header, nav, main, footer) that
-   disappeared, or a page that no longer loads. A regression stops the promotion to the next
+   disappeared, a page that now lands on another URL (login, maintenance), or a page that no
+   longer loads. A regression stops the promotion to the next
    environment: report it with the table and the Step 7 rollback, and push nothing further
-   until the user decides. A `warn` (slower page) is reported, not blocking.
+   until the user decides. A `warn` (slower page, changed title, a page already failing before
+   the push) is reported, not blocking.

@@ -1,0 +1,26 @@
+{
+  "tool": "canary",
+  "version": 1,
+  "takenAt": "2026-11-25T00:00:00Z",
+  "host": "www.example.test",
+  "pages": [
+    {
+      "url": "https://www.example.test/",
+      "finalUrl": "https://www.example.test/",
+      "status": 200,
+      "ms": 400,
+      "title": "Home",
+      "consoleErrors": [
+        "Uncaught Error: HTTP 500 loading widget"
+      ],
+      "failedRequests": [],
+      "landmarks": {
+        "h1": true,
+        "header": true,
+        "nav": true,
+        "main": true,
+        "footer": true
+      }
+    }
+  ]
+}

@@ -10,7 +10,7 @@
       "ms": 400,
       "title": "Home",
       "consoleErrors": [
-        "Error 12 at 1700000000"
+        "Error id 123456 at 1700000000"
       ],
       "failedRequests": [],
       "landmarks": {

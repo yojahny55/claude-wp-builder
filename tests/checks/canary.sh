@@ -48,6 +48,14 @@ expect 1 base page-missing 'missing'
 expect 0 base slow-small
 expect 0 slow-base slow-big 'warn'
 expect 64 base other-host 'host'
+expect 0 broken-before broken-after-503 'already failing'
+expect 0 broken-before broken-before 'already failing'
+expect 1 www-base broken-after-503 '503'
+expect 1 www-base redirected 'maintenance'
+expect 0 www-base title-changed 'title'
+expect 1 www-base asset-apex 'x.css'
+expect 1 console-404 console-500 'HTTP 500'
+expect 64 www-base duplicate-urls 'duplicate'
 
 json=$(node "$tool" compare "$fx/base.json" "$fx/status-500.json" --json || true)
 printf '%s' "$json" | node -e 'const r=JSON.parse(require("fs").readFileSync(0,"utf8")); if (r.regressions!==1||!Array.isArray(r.pages)) process.exit(1)' \
@@ -85,7 +93,7 @@ for _ in $(seq 50); do [ -s "$tmp/port" ] && break; sleep 0.1; done
 port=$(sed -n 1p "$tmp/port")
 [ -n "$port" ] || fail "fixture server did not start"
 
-node "$tool" snapshot "http://127.0.0.1:$port/" --out "$tmp/snap.json" --delay 0 >/dev/null 2>"$tmp/err" \
+timeout 120 node "$tool" snapshot "http://127.0.0.1:$port/" --out "$tmp/snap.json" --delay 0 >/dev/null 2>"$tmp/err" \
   || fail "snapshot failed: $(cat "$tmp/err")"
 node -e '
 const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
@@ -97,6 +105,7 @@ if (!p.failedRequests.some(r => r.url.endsWith("/missing.css") && r.status === 4
 if (p.consoleErrors.length !== 1 || !/fixture boom/.test(p.consoleErrors[0])) bad.push("consoleErrors " + JSON.stringify(p.consoleErrors));
 for (const l of ["h1","header","nav","main","footer"]) if (p.landmarks[l] !== true) bad.push("landmark " + l);
 if (typeof p.ms !== "number") bad.push("ms");
+if (!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(p.finalUrl || "")) bad.push("finalUrl " + p.finalUrl);
 if (bad.length) { console.error(bad.join("\n")); process.exit(1); }
 ' "$tmp/snap.json" || fail "snapshot JSON is not what the page holds"
 
@@ -105,7 +114,7 @@ node "$tool" compare "$tmp/snap.json" "$tmp/snap.json" >/dev/null || fail "a sna
 
 # A page that cannot load is recorded with an error, not dropped.
 kill "$srv" 2>/dev/null; wait "$srv" 2>/dev/null || true; srv=""
-rc=0; node "$tool" snapshot "http://127.0.0.1:$port/" --out "$tmp/down.json" --delay 0 --timeout 5 >/dev/null 2>&1 || rc=$?
+rc=0; timeout 120 node "$tool" snapshot "http://127.0.0.1:$port/" --out "$tmp/down.json" --delay 0 --timeout 5 >/dev/null 2>&1 || rc=$?
 [ "$rc" = 2 ] || fail "snapshot of an unreachable host exits $rc, want 2 (nothing measured)"
 node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); if(!s.pages[0].error) process.exit(1)' "$tmp/down.json" \
   || fail "unreachable page not recorded with an error"
@@ -114,5 +123,7 @@ rc=0; node "$tool" snapshot "http://a.test/" "http://b.test/" --out "$tmp/x.json
 [ "$rc" = 64 ] || fail "snapshot of two hosts exits $rc, want 64"
 rc=0; node "$tool" snapshot "http://a.test/" >/dev/null 2>&1 || rc=$?
 [ "$rc" = 64 ] || fail "snapshot without --out exits $rc, want 64"
+rc=0; node "$tool" snapshot "http://a.test/x" "http://a.test/x#top" --out "$tmp/x.json" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 64 ] || fail "snapshot with a duplicate URL exits $rc, want 64"
 
 echo PASS

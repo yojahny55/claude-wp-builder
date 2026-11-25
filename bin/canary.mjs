@@ -16,10 +16,11 @@
  * and reports, per page, ok / warn / regression.
  *
  * Regression: a 2xx/3xx page that no longer is; a console error that was not there before
- * (digit runs normalized, so ids and timestamps do not read as new); a same-site request
- * (the host or a subdomain of it) that now fails; a landmark that disappeared; a page that
- * now errors or is missing. Warning only: load time over 2x the baseline and over 3 s, since
- * live timing is noisy. Third-party failures (analytics, CDNs of others) never count.
+ * (runs of 4+ digits normalized, so ids and timestamps do not read as new); a same-site
+ * request (the host, its www-less apex or a subdomain of it) that now fails; a landmark that
+ * disappeared; a page that now lands on another URL (redirect to login or maintenance), errors
+ * or is missing. Warning only: a changed title, a page that was already failing before the push,
+ * and load time over 2x the baseline and over 3 s, since live timing is noisy. Third-party failures (analytics, CDNs of others) never count.
  *
  * Nothing is installed: playwright-core comes from PLAYWRIGHT_CORE or an existing install,
  * Chromium from bin/lib/browsers.mjs. Production runs go through bin/prod-gate.sh.
@@ -36,6 +37,7 @@ import { findBrowser } from './lib/browsers.mjs';
 export const LANDMARKS = ['h1', 'header', 'nav', 'main', 'footer'];
 const SLOW_FACTOR = 2;
 const SLOW_FLOOR_MS = 3000;
+const SETTLE_MS = 3000;
 
 class UsageError extends Error {}
 
@@ -44,18 +46,37 @@ function usage(msg, code = 64) {
   process.exit(code);
 }
 
-/** A host and its subdomains are "same site"; anything else is third party. */
+/**
+ * "Same site" = the snapshot host, its www-less apex, and any subdomain of that apex
+ * (www.site.test, site.test, cdn.site.test). Anything else is third party.
+ */
 export function sameSite(url, host) {
+  const apex = host.replace(/^www\./, '');
   try {
     const h = new URL(url).hostname;
-    return h === host || h.endsWith(`.${host}`);
+    return h === host || h === apex || h.endsWith(`.${apex}`);
   } catch {
     return false;
   }
 }
 
-const norm = (text) => String(text).replace(/\d+/g, '#').trim();
+/** Only long digit runs are volatile (ids, timestamps); HTTP codes and short numbers keep their meaning. */
+const norm = (text) => String(text).replace(/\d{4,}/g, '#').trim();
 const ok = (status) => status >= 200 && status < 400;
+const broken = (p) => !!p.error || !ok(p.status);
+/** Origin + path of where the page ended up, ignoring query and fragment. */
+const landing = (p) => {
+  try { const u = new URL(p.finalUrl ?? p.url); return u.origin + u.pathname; } catch { return String(p.finalUrl ?? p.url); }
+};
+
+function byUrl(snapshot, label) {
+  const map = new Map();
+  for (const p of snapshot.pages) {
+    if (map.has(p.url)) throw new UsageError(`duplicate page ${p.url} in the ${label} snapshot`);
+    map.set(p.url, p);
+  }
+  return map;
+}
 
 export function compareSnapshots(before, after) {
   for (const s of [before, after]) {
@@ -64,19 +85,26 @@ export function compareSnapshots(before, after) {
   if (before.host !== after.host) {
     throw new UsageError(`snapshots are of different hosts (${before.host} vs ${after.host})`);
   }
-  const afterByUrl = new Map(after.pages.map((p) => [p.url, p]));
+  byUrl(before, 'before');
+  const afterByUrl = byUrl(after, 'after');
   const pages = [];
   for (const b of before.pages) {
     const a = afterByUrl.get(b.url);
     const reasons = [];
     let verdict = 'ok';
     const regress = (r) => { reasons.push(r); verdict = 'regression'; };
+    const warn = (r) => { reasons.push(r); if (verdict === 'ok') verdict = 'warn'; };
     if (!a) {
       regress('page missing from the after snapshot');
-    } else if (a.error && !b.error) {
+    } else if (broken(b)) {
+      // Not caused by this push, but never reported as ok while the page is down.
+      if (broken(a)) warn(`already failing before the push, still failing: ${a.error ?? `status ${a.status}`}`);
+      else warn('was failing before the push, loads now');
+    } else if (a.error) {
       regress(`page failed to load: ${a.error}`);
     } else {
-      if (ok(b.status) && !ok(a.status)) regress(`status ${b.status} -> ${a.status}`);
+      if (!ok(a.status)) regress(`status ${b.status} -> ${a.status}`);
+      if (landing(a) !== landing(b)) regress(`now lands on ${landing(a)} (was ${landing(b)})`);
       const seen = new Set((b.consoleErrors ?? []).map(norm));
       for (const e of a.consoleErrors ?? []) if (!seen.has(norm(e))) regress(`new console error: ${e}`);
       const failedBefore = new Set((b.failedRequests ?? []).map((r) => r.url));
@@ -86,10 +114,8 @@ export function compareSnapshots(before, after) {
         }
       }
       for (const l of LANDMARKS) if (b.landmarks?.[l] && !a.landmarks?.[l]) regress(`landmark gone: ${l}`);
-      if (verdict === 'ok' && a.ms > b.ms * SLOW_FACTOR && a.ms > SLOW_FLOOR_MS) {
-        reasons.push(`slower: ${b.ms} ms -> ${a.ms} ms`);
-        verdict = 'warn';
-      }
+      if (a.title !== b.title) warn(`title changed: "${b.title}" -> "${a.title}"`);
+      if (a.ms > b.ms * SLOW_FACTOR && a.ms > SLOW_FLOOR_MS) warn(`slower: ${b.ms} ms -> ${a.ms} ms`);
     }
     pages.push({ url: b.url, verdict, reasons });
   }
@@ -186,6 +212,10 @@ function parseSnapshotArgs(args) {
     if (!/^https?:$/.test(url.protocol)) usage(`not an http(s) URL: ${u}`);
     hosts.add(url.hostname);
   }
+  const keys = o.urls.map((u) => { const x = new URL(u); x.hash = ''; return x.href; });
+  const dup = keys.find((k, i) => keys.indexOf(k) !== i);
+  if (dup) usage(`duplicate URL: ${dup}`);
+  o.urls = keys;
   if (hosts.size !== 1) usage(`all URLs must be on one host, got: ${[...hosts].join(', ')}`);
   o.host = [...hosts][0];
   return o;
@@ -205,21 +235,26 @@ async function snapPage(context, url, timeoutMs) {
   page.on('requestfailed', (r) => { if (!failed.has(r.url())) failed.set(r.url(), 0); });
   page.on('response', (r) => { if (r.status() >= 400) failed.set(r.url(), r.status()); });
   const started = Date.now();
-  const result = { url, status: 0, ms: 0, title: '', consoleErrors, failedRequests: [], landmarks: {} };
+  const result = { url, finalUrl: url, status: 0, ms: 0, title: '', consoleErrors, failedRequests: [], landmarks: {} };
+  // goto honours its own timeout; title, evaluate and close do not, so each is raced.
+  const bounded = (p, what) => Promise.race([p, new Promise((_, rej) =>
+    setTimeout(() => rej(new Error(`${what} did not finish in ${timeoutMs} ms`)), timeoutMs).unref())]);
   try {
     const res = await page.goto(url, { waitUntil: 'load', timeout: timeoutMs });
     result.ms = Date.now() - started;
     result.status = res ? res.status() : 0;
-    result.title = await page.title();
-    result.landmarks = await page.evaluate(landmarkProbe);
-    const finalUrl = page.url();
+    // Late errors (deferred init, lazy assets) land after "load": settle briefly, bounded.
+    await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => {});
+    result.title = await bounded(page.title(), 'page.title()');
+    result.landmarks = await bounded(page.evaluate(landmarkProbe), 'landmark probe');
+    result.finalUrl = page.url();
     failed.delete(url);
-    failed.delete(finalUrl);
+    failed.delete(result.finalUrl);
   } catch (e) {
     result.ms = Date.now() - started;
     result.error = String(e?.message ?? e).split('\n')[0];
   } finally {
-    await page.close().catch(() => {});
+    await bounded(page.close(), 'page.close()').catch(() => {});
   }
   result.failedRequests = [...failed].map(([u, status]) => ({ url: u, status }));
   return result;
