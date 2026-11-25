@@ -80,8 +80,10 @@ import { createServer } from 'node:http';
 const html = `<!doctype html><html><head><title>Fixture</title>
 <link rel="stylesheet" href="/missing.css"></head><body>
 <header>h</header><nav>n</nav><main><h1>Title</h1></main><footer>f</footer>
-<script>console.error('fixture boom 42')</script></body></html>`;
+<script>console.error('fixture boom 42')</script>
+<script>setTimeout(() => console.error('late boom'), 200)</script></body></html>`;
 const s = createServer((req, res) => {
+  if (req.url === '/go') { res.writeHead(302, { location: '/' }); res.end(); return; }
   if (req.url === '/') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(html); return; }
   res.writeHead(404); res.end('nope');
 });
@@ -102,12 +104,21 @@ if (s.tool !== "canary" || s.version !== 1 || s.host !== "127.0.0.1") bad.push("
 if (p.status !== 200) bad.push("status " + p.status);
 if (p.title !== "Fixture") bad.push("title " + p.title);
 if (!p.failedRequests.some(r => r.url.endsWith("/missing.css") && r.status === 404)) bad.push("failedRequests " + JSON.stringify(p.failedRequests));
-if (p.consoleErrors.length !== 1 || !/fixture boom/.test(p.consoleErrors[0])) bad.push("consoleErrors " + JSON.stringify(p.consoleErrors));
+// The second error fires after "load": the snapshot must settle long enough to catch it.
+if (p.consoleErrors.length !== 2 || !/fixture boom/.test(p.consoleErrors[0]) || !/late boom/.test(p.consoleErrors[1])) bad.push("consoleErrors " + JSON.stringify(p.consoleErrors));
 for (const l of ["h1","header","nav","main","footer"]) if (p.landmarks[l] !== true) bad.push("landmark " + l);
 if (typeof p.ms !== "number") bad.push("ms");
 if (!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(p.finalUrl || "")) bad.push("finalUrl " + p.finalUrl);
 if (bad.length) { console.error(bad.join("\n")); process.exit(1); }
 ' "$tmp/snap.json" || fail "snapshot JSON is not what the page holds"
+
+# A redirect is recorded where it lands, so compare can tell it from the page it replaced.
+timeout 120 node "$tool" snapshot "http://127.0.0.1:$port/go" --out "$tmp/go.json" --delay 0 >/dev/null 2>"$tmp/err" \
+  || fail "snapshot of a redirect failed: $(cat "$tmp/err")"
+node -e '
+const p = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).pages[0];
+if (!p.url.endsWith("/go") || !/^http:\/\/127\.0\.0\.1:\d+\/$/.test(p.finalUrl || "")) { console.error(JSON.stringify({url:p.url,finalUrl:p.finalUrl})); process.exit(1); }
+' "$tmp/go.json" || fail "snapshot does not record the URL a redirect lands on"
 
 # A snapshot of itself compares clean, and the same 404 is not new.
 node "$tool" compare "$tmp/snap.json" "$tmp/snap.json" >/dev/null || fail "a snapshot compared with itself is not clean"
