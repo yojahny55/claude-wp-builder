@@ -1,0 +1,40 @@
+{
+  "tool": "canary",
+  "version": 1,
+  "takenAt": "2026-11-25T00:00:00Z",
+  "host": "example.test",
+  "pages": [
+    {
+      "url": "https://example.test/",
+      "status": 200,
+      "ms": 400,
+      "title": "Home",
+      "consoleErrors": [
+        "Error 12 at 1700000000"
+      ],
+      "failedRequests": [],
+      "landmarks": {
+        "h1": true,
+        "header": true,
+        "nav": true,
+        "main": true,
+        "footer": true
+      }
+    },
+    {
+      "url": "https://example.test/shop/",
+      "status": 200,
+      "ms": 400,
+      "title": "Home",
+      "consoleErrors": [],
+      "failedRequests": [],
+      "landmarks": {
+        "h1": true,
+        "header": true,
+        "nav": true,
+        "main": true,
+        "footer": true
+      }
+    }
+  ]
+}
