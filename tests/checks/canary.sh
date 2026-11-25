@@ -15,6 +15,17 @@ fx=tests/fixtures/canary
 command -v node >/dev/null || { echo "PASS (SKIP: no node — $tool not exercised)"; exit 0; }
 
 # expect <exit> <before> <after> [grep-text]: compare exits <exit> and, if given, prints the text.
+# /wp-update runs the canary around the staging and production pushes.
+upd=commands/wp-update.md
+need() { grep -F -- "$1" "$upd" >/dev/null || fail "$upd lacks: $1"; }
+need 'Step 8: After the Push'
+need 'bin/canary.mjs" snapshot'
+need 'bin/canary.mjs" compare'
+need 'bin/prod-gate.sh'
+need 'environments'
+need 'A regression stops the promotion'
+grep -F 'canary.mjs' docs/exit-codes.md >/dev/null || fail "docs/exit-codes.md has no canary.mjs section"
+
 expect() {
   local want=$1 before=$2 after=$3 text=${4:-} out rc=0
   out=$(node "$tool" compare "$fx/$before.json" "$fx/$after.json" 2>&1) || rc=$?

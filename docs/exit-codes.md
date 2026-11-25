@@ -65,6 +65,16 @@ named exception (read by every command through `skills/wp-manifest-gate/SKILL.md
 | 1 | usage or invalid input (bad replay record, local host or path would leak) |
 | 3 | crash |
 
+### `canary.mjs`
+
+| Code | Meaning |
+|---|---|
+| 0 | snapshot written with at least one page loaded; compare found no regression (warnings allowed) |
+| 1 | compare found a regression |
+| 2 | could not measure: no playwright-core, no Chromium, or no page loaded |
+| 3 | crash |
+| 64 | usage: bad arguments, URLs on more than one host, snapshots of different hosts |
+
 ### `composition-preview.mjs`
 
 | Code | Meaning |

@@ -300,6 +300,8 @@ Print one block, then the rollback:
   package for the locale) and the next option.
 - Migrations run and their outcome; version skew flagged.
 - Verification: page table, new fatals (count), head-script result, suite result.
+- Next: when the update will be pushed to staging or production, Step 8 snapshots each
+  environment before the push and compares it after.
 - Backup path and its contents.
 - Commits made since the last reviewed point (git roots only).
 - **Rollback**: `bash "${CLAUDE_PLUGIN_ROOT}/bin/wp-restore.sh" '<wp-root>' "$B" --wrapper "$WP"`
@@ -309,3 +311,36 @@ Print one block, then the rollback:
   updated plugin directories; `tar -xzf "$B/core.tar.gz" -C <wp-root>` for core), then
   `$WP cache flush`. Database migrations in Step 4 are only undone by the db import, so restore
   both together.
+
+## Step 8: After the Push (staging, production)
+
+`/wp-update` verified the root it ran on. When the update then reaches staging or production by
+`git push` (or any other deploy), measure the live site around that push. Run this step once per
+environment, in rollout order, and only after Step 5 passed on the clone.
+
+1. **URLs.** The key pages of Step 5, item 1, mapped onto the environment's URL: read
+   `environments.<name>.url` for the entry whose role is `staging` or `prod` (`wp-config.mjs`
+   wrote them). No such entry: ask for the URL; never guess a host.
+2. **Before the push**, snapshot that environment. Snapshots go in this run's backup folder
+   `$B`, never under the WordPress root:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/bin/canary.mjs" snapshot <url>... --out "$B/canary-<env>-before.json"
+   ```
+
+   On production, wrap the same command in the pacing gate:
+   `bash "${CLAUDE_PLUGIN_ROOT}/bin/prod-gate.sh" --prod <host> -- node "${CLAUDE_PLUGIN_ROOT}/bin/canary.mjs" snapshot …`.
+   Exit `2` means nothing was measured (no browser, or no page loaded): say "canary not run"
+   with its message and ask before pushing without a baseline.
+3. **After the push** (and after the host's cache purge, if it has one), take
+   `canary-<env>-after.json` the same way, then compare:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/bin/canary.mjs" compare "$B/canary-<env>-before.json" "$B/canary-<env>-after.json"
+   ```
+
+   Quote the table. Exit `1` lists regressions: a page whose status broke, a new console error,
+   a same-site asset that now fails, a landmark (`h1`, header, nav, main, footer) that
+   disappeared, or a page that no longer loads. A regression stops the promotion to the next
+   environment: report it with the table and the Step 7 rollback, and push nothing further
+   until the user decides. A `warn` (slower page) is reported, not blocking.

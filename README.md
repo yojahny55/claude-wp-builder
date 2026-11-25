@@ -602,6 +602,7 @@ Commands run these and read the exit code. Several are gates, not helpers.
 | `audit-runbook.mjs` | Renders `/wp-audit`'s replay record as an ordered production runbook: pre-deploy checks, code, wp-config, WP-CLI with a production `--url`, nginx and Apache server rules marked not applied, post-deploy, verification curls |
 | `audit-suite.sh` | Scaffolds and runs the Tier 3 browser suite (`/wp-audit --suite`) |
 | `link-sweep.mjs` | The audits' link sweep — at most 4 requests in flight, sampling, clone-origin and CDN-challenge rules built in |
+| `canary.mjs` | `/wp-update` Step 8: snapshots a live site's key pages before a push to staging or production and flags what broke after it |
 | `h2-proxy.mjs` | HTTP/2 + TLS + brotli proxy (runtime self-signed cert, HTML cache) in front of a local HTTP site, so Lighthouse on a clone resembles production |
 | `contrast-propose.mjs` | Nearest compliant shade per failing colour pair, ratio before/after, affected texts and pages: the palette proposal for client approval |
 | `ux-probe.mjs` | The usability audit's page harness — one browser launch per run, built-in DOM probes, a 3-launch / 15-minute budget enforced in code |
